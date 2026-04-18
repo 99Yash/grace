@@ -1,0 +1,4 @@
+{
+  "extends": "@grace/config/tsconfig.base.json",
+  "include": ["src/**/*.ts"]
+}

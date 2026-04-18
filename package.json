@@ -1,0 +1,44 @@
+{
+  "name": "grace",
+  "private": true,
+  "type": "module",
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "elysia": "^1.4.22",
+      "@elysiajs/cors": "^1.4.1",
+      "@elysiajs/eden": "^1.4.6",
+      "@opentui/core": "^0.1.100",
+      "@opentui/solid": "^0.1.100",
+      "solid-js": "^1.9.5",
+      "zod": "^4.1.13",
+      "typescript": "^5.8.3",
+      "@types/bun": "^1.3.4",
+      "drizzle-orm": "^0.38.0",
+      "imapflow": "^1.0.0"
+    }
+  },
+  "scripts": {
+    "dev": "bun run dev:server & bun run dev:tui",
+    "dev:server": "turbo -F server dev",
+    "dev:tui": "bun run --cwd apps/tui src/index.tsx",
+    "oauth:login": "bun apps/server/src/cli/oauth-login.ts",
+    "smoke:imap": "bun apps/server/src/cli/smoke-imap.ts",
+    "smoke:bootstrap": "bun apps/server/src/cli/smoke-bootstrap.ts",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "check": "oxlint && oxfmt --write"
+  },
+  "devDependencies": {
+    "@grace/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "oxfmt": "^0.26.0",
+    "oxlint": "^1.41.0",
+    "turbo": "^2.8.14",
+    "typescript": "catalog:"
+  },
+  "packageManager": "bun@1.3.2"
+}

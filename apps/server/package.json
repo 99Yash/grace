@@ -1,0 +1,25 @@
+{
+  "name": "server",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "bun --env-file=../../.env run --hot src/index.ts",
+    "start": "bun --env-file=../../.env run src/index.ts",
+    "check-types": "tsc -b"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "catalog:",
+    "@grace/api": "workspace:*",
+    "@grace/auth": "workspace:*",
+    "@grace/db": "workspace:*",
+    "@grace/env": "workspace:*",
+    "@grace/mail": "workspace:*",
+    "elysia": "catalog:"
+  },
+  "devDependencies": {
+    "@grace/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

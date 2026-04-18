@@ -1,0 +1,11 @@
+{
+  "name": "@grace/config",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json"
+  },
+  "files": [
+    "tsconfig.base.json"
+  ]
+}

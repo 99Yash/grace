@@ -1,0 +1,27 @@
+{
+  "name": "@grace/mail",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc -b"
+  },
+  "dependencies": {
+    "@grace/auth": "workspace:*",
+    "@grace/db": "workspace:*",
+    "@grace/env": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "html-to-text": "^9.0.5",
+    "imapflow": "catalog:",
+    "mailparser": "^3.9.8"
+  },
+  "devDependencies": {
+    "@grace/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "@types/html-to-text": "^9.0.4",
+    "@types/mailparser": "^3.4.6",
+    "typescript": "catalog:"
+  }
+}
