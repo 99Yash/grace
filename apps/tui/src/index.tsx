@@ -2,11 +2,13 @@ import { render, useKeyboard } from "@opentui/solid";
 import { treaty } from "@elysiajs/eden";
 import type { App as ApiApp, SearchHit } from "@grace/api";
 import { DAEMON_DEFAULT_HOST, DAEMON_DEFAULT_PORT } from "@grace/env";
+import type { InputRenderable, TextareaRenderable } from "@opentui/core";
 import { createEffect, createResource, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { formatRelative, truncate } from "./format.ts";
 import { subscribeSse, subscribeSseOnce } from "./sse.ts";
 
 const client = treaty<ApiApp>(`http://${DAEMON_DEFAULT_HOST}:${DAEMON_DEFAULT_PORT}`);
+const DEBUG = Boolean(process.env.GRACE_DEBUG);
 
 type Message = {
   gmMsgid: string;
@@ -138,6 +140,57 @@ const COL = {
   date: 6,
 } as const;
 
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
+
+function Spinner(props: { color?: string; label?: string }) {
+  const [frame, setFrame] = createSignal(0);
+  const timer = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), 80);
+  onCleanup(() => clearInterval(timer));
+  const color = () => props.color ?? "#9ca3af";
+  return (
+    <box flexDirection="row" flexShrink={0}>
+      <text fg={color()}>{SPINNER_FRAMES[frame()]}</text>
+      <Show when={props.label}>
+        <text fg={color()}> {props.label}</text>
+      </Show>
+    </box>
+  );
+}
+
+// Deferred visibility: wait 500ms before showing, hold ≥3s once shown.
+// Mirrors opencode's startup-loading pattern — prevents flashy spinners on fast ops.
+function useDeferredShow(active: () => boolean, showDelayMs = 500, minHoldMs = 3000) {
+  const [show, setShow] = createSignal(false);
+  let wait: ReturnType<typeof setTimeout> | undefined;
+  let hold: ReturnType<typeof setTimeout> | undefined;
+  let shownAt = 0;
+
+  createEffect(() => {
+    if (active()) {
+      if (hold) { clearTimeout(hold); hold = undefined; }
+      if (show() || wait) return;
+      wait = setTimeout(() => {
+        wait = undefined;
+        shownAt = Date.now();
+        setShow(true);
+      }, showDelayMs);
+      return;
+    }
+    if (wait) { clearTimeout(wait); wait = undefined; }
+    if (!show() || hold) return;
+    const left = minHoldMs - (Date.now() - shownAt);
+    if (left <= 0) { setShow(false); return; }
+    hold = setTimeout(() => { hold = undefined; setShow(false); }, left);
+  });
+
+  onCleanup(() => {
+    if (wait) clearTimeout(wait);
+    if (hold) clearTimeout(hold);
+  });
+
+  return show;
+}
+
 function MessageRow(props: { msg: Message; selected: boolean; compact: boolean }) {
   const subjectFg = () => (props.selected ? "#ffffff" : props.msg.read ? "#7a7a7a" : "#e5e7eb");
   const metaFg = () => (props.selected ? "#b8d4ff" : "#6b7280");
@@ -179,7 +232,6 @@ interface ScrollBoxLike {
   scrollTo?: (p: number | { x: number; y: number }) => void;
 }
 
-// Reactive debug state so UI actually updates. Set from InboxList.
 export const [debugTop, setDebugTop] = createSignal(0);
 export const [debugView, setDebugView] = createSignal(0);
 export const [debugSh, setDebugSh] = createSignal(0);
@@ -192,13 +244,15 @@ function InboxList(props: { messages: Message[]; selected: () => number; compact
   createEffect(() => {
     const sel = props.selected();
     const s = scrollRef();
-    setDebugRef(!!s);
+    if (DEBUG) setDebugRef(!!s);
     if (!s) return;
     const view = s.viewport?.height ?? 0;
     const top = s.scrollTop ?? 0;
-    setDebugTop(top);
-    setDebugView(view);
-    setDebugSh(s.scrollHeight ?? 0);
+    if (DEBUG) {
+      setDebugTop(top);
+      setDebugView(view);
+      setDebugSh(s.scrollHeight ?? 0);
+    }
     if (view <= 0) return;
     let next = top;
     if (sel < top + SCROLL_MARGIN) {
@@ -268,6 +322,8 @@ function Reader(props: {
   error: unknown;
   rendered: string | null;
   renderMode: "text" | "w3m";
+  w3mBusy: boolean;
+  staleLines: string[] | null;
 }) {
   const lines = () => {
     if (props.renderMode === "w3m" && props.rendered) return props.rendered.split("\n");
@@ -277,37 +333,47 @@ function Reader(props: {
     if (html) return ["(no plain-text part — press v for w3m render or V to open in browser)"];
     return [""];
   };
+  const showStale = () => props.loading && props.staleLines && props.staleLines.length > 0;
+  const displayLines = () => (showStale() ? props.staleLines! : lines());
+  const textColor = () => (showStale() ? "#4b5563" : "#d1d5db");
+
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} overflow="hidden">
       <BodyHeader msg={props.msg} />
       <Show when={!props.error} fallback={
         <box padding={1}><text fg="#f87171">failed to load body: {String(props.error)}</text></box>
       }>
-        <Show when={!props.loading} fallback={
-          <box padding={1}><text fg="#6b7280">loading body…</text></box>
-        }>
-          <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0} paddingLeft={1} paddingRight={1}>
-            <For each={lines()}>
-              {(line) => (
-                <box height={1} flexShrink={0} overflow="hidden">
-                  <text fg="#d1d5db">{line || " "}</text>
-                </box>
+        <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0} paddingLeft={1} paddingRight={1}>
+          <Show when={props.loading && !showStale()}>
+            <box flexDirection="row" padding={1}>
+              <Spinner color="#6b7280" label="loading body…" />
+            </box>
+          </Show>
+          <Show when={props.w3mBusy}>
+            <box flexDirection="row" padding={1}>
+              <Spinner color="#6b7280" label="rendering html…" />
+            </box>
+          </Show>
+          <For each={displayLines()}>
+            {(line) => (
+              <box height={1} flexShrink={0} overflow="hidden">
+                <text fg={textColor()}>{line || " "}</text>
+              </box>
+            )}
+          </For>
+          <Show when={!showStale() && props.body?.attachments && props.body.attachments.length > 0}>
+            <box height={1} flexShrink={0} backgroundColor="#1f2937" />
+            <text fg="#9ca3af">attachments:</text>
+            <For each={props.body!.attachments}>
+              {(a) => (
+                <text fg="#6b7280">
+                  {"  "}
+                  {a.filename ?? "(unnamed)"} · {a.contentType} · {formatBytes(a.size)}
+                </text>
               )}
             </For>
-            <Show when={props.body?.attachments && props.body.attachments.length > 0}>
-              <box height={1} flexShrink={0} backgroundColor="#1f2937" />
-              <text fg="#9ca3af">attachments:</text>
-              <For each={props.body!.attachments}>
-                {(a) => (
-                  <text fg="#6b7280">
-                    {"  "}
-                    {a.filename ?? "(unnamed)"} · {a.contentType} · {formatBytes(a.size)}
-                  </text>
-                )}
-              </For>
-            </Show>
-          </scrollbox>
-        </Show>
+          </Show>
+        </scrollbox>
       </Show>
     </box>
   );
@@ -351,11 +417,13 @@ function SearchHitRow(props: { hit: SearchHit; selected: boolean }) {
 }
 
 function SearchOverlay(props: {
-  query: string;
   hits: SearchHit[];
   selected: number;
   phase: "idle" | "searching" | "local-done" | "done" | "error";
   errorMessage: string | null;
+  hasQuery: boolean;
+  onInput: (value: string) => void;
+  inputRef: (r: InputRenderable) => void;
 }) {
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0}>
@@ -371,27 +439,41 @@ function SearchOverlay(props: {
         <text fg="#9ca3af" flexShrink={0}>
           search:{" "}
         </text>
-        <text fg="#ffffff" flexGrow={1} flexShrink={1}>
-          {props.query}
-        </text>
-        <text fg="#4da3ff" flexShrink={0}>
-          ▌
-        </text>
+        <input
+          ref={props.inputRef}
+          focused
+          onInput={props.onInput}
+          textColor="#ffffff"
+          focusedTextColor="#ffffff"
+          cursorColor="#4da3ff"
+          backgroundColor="transparent"
+          focusedBackgroundColor="transparent"
+          flexGrow={1}
+          flexShrink={1}
+        />
       </box>
       <box flexDirection="row" height={1} flexShrink={0} paddingLeft={1} paddingRight={1}>
-        <text fg="#6b7280" flexGrow={1}>
-          <Switch fallback="type Gmail query · esc cancels">
-            <Match when={props.phase === "searching"}>searching…</Match>
-            <Match when={props.phase === "local-done"}>local {props.hits.length} · fetching Gmail…</Match>
-            <Match when={props.phase === "done"}>{props.hits.length} result{props.hits.length === 1 ? "" : "s"}</Match>
-            <Match when={props.phase === "error"}>error: {props.errorMessage ?? "unknown"}</Match>
-          </Switch>
-        </text>
+        <Switch fallback={<text fg="#6b7280" flexGrow={1}>type Gmail query · esc cancels</text>}>
+          <Match when={props.phase === "searching"}>
+            <Spinner color="#6b7280" label="searching…" />
+          </Match>
+          <Match when={props.phase === "local-done"}>
+            <Spinner color="#6b7280" label={`local ${props.hits.length} · fetching Gmail…`} />
+          </Match>
+          <Match when={props.phase === "done"}>
+            <text fg="#6b7280" flexGrow={1}>
+              {props.hits.length} result{props.hits.length === 1 ? "" : "s"}
+            </text>
+          </Match>
+          <Match when={props.phase === "error"}>
+            <text fg="#f87171" flexGrow={1}>error: {props.errorMessage ?? "unknown"}</text>
+          </Match>
+        </Switch>
       </box>
       <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0}>
         <For each={props.hits} fallback={
           <box padding={1}><text fg="#6b7280">
-            <Show when={props.query === ""} fallback="no results yet">
+            <Show when={!props.hasQuery} fallback="no results yet">
               start typing to search local cache + Gmail
             </Show>
           </text></box>
@@ -473,44 +555,19 @@ function FolderRow(props: { folder: Folder; selected: boolean; focused: boolean 
 type ComposeField = "to" | "subject" | "body";
 
 function ComposeOverlay(props: {
-  to: string;
-  subject: string;
-  body: string;
   field: ComposeField;
   sending: boolean;
+  showSpinner: boolean;
   statusLine: string;
+  onToInput: (v: string) => void;
+  onSubjectInput: (v: string) => void;
+  onBodyChange: () => void;
+  onFieldSubmit: () => void;
+  toRef: (r: InputRenderable) => void;
+  subjectRef: (r: InputRenderable) => void;
+  bodyRef: (r: TextareaRenderable) => void;
 }) {
-  const fieldRow = (label: string, value: string, focused: boolean, multiline = false) => {
-    const lines = multiline ? (value === "" ? [""] : value.split("\n")) : [value];
-    return (
-      <box
-        flexDirection="row"
-        flexShrink={multiline ? 1 : 0}
-        paddingLeft={1}
-        paddingRight={1}
-        backgroundColor={focused ? "#1f2937" : "transparent"}
-      >
-        <text fg={focused ? "#ffffff" : "#6b7280"} width={9} flexShrink={0}>
-          {label}
-        </text>
-        <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={multiline ? 0 : 1}>
-          <For each={lines}>
-            {(line, i) => (
-              <box height={1} flexShrink={0} overflow="hidden" flexDirection="row">
-                <text fg="#e5e7eb" flexGrow={1} flexShrink={1}>
-                  {line || " "}
-                </text>
-                <Show when={focused && i() === lines.length - 1}>
-                  <text fg="#4da3ff" flexShrink={0}>▌</text>
-                </Show>
-              </box>
-            )}
-          </For>
-        </box>
-      </box>
-    );
-  };
-
+  const cursor = () => (props.sending ? "#4b5563" : "#4da3ff");
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0}>
       <box
@@ -524,14 +581,86 @@ function ComposeOverlay(props: {
         <text attributes={1} fg="#ffffff" flexGrow={1}>
           compose
         </text>
-        <text fg="#9ca3af">{props.statusLine}</text>
+        <Show when={props.showSpinner} fallback={<text fg="#9ca3af">{props.statusLine}</text>}>
+          <Spinner color="#fbbf24" label="sending…" />
+        </Show>
       </box>
-      {fieldRow("To:", props.to, props.field === "to")}
-      {fieldRow("Subject:", props.subject, props.field === "subject")}
+      <box
+        flexDirection="row"
+        height={1}
+        flexShrink={0}
+        paddingLeft={1}
+        paddingRight={1}
+        backgroundColor={props.field === "to" ? "#1f2937" : "transparent"}
+      >
+        <text fg={props.field === "to" ? "#ffffff" : "#6b7280"} width={9} flexShrink={0}>
+          To:
+        </text>
+        <input
+          ref={props.toRef}
+          focused={props.field === "to"}
+          onInput={props.onToInput}
+          onSubmit={props.onFieldSubmit}
+          textColor="#e5e7eb"
+          focusedTextColor="#e5e7eb"
+          cursorColor={cursor()}
+          backgroundColor="transparent"
+          focusedBackgroundColor="transparent"
+          placeholder="name@example.com"
+          placeholderColor="#4b5563"
+          flexGrow={1}
+          flexShrink={1}
+        />
+      </box>
+      <box
+        flexDirection="row"
+        height={1}
+        flexShrink={0}
+        paddingLeft={1}
+        paddingRight={1}
+        backgroundColor={props.field === "subject" ? "#1f2937" : "transparent"}
+      >
+        <text fg={props.field === "subject" ? "#ffffff" : "#6b7280"} width={9} flexShrink={0}>
+          Subject:
+        </text>
+        <input
+          ref={props.subjectRef}
+          focused={props.field === "subject"}
+          onInput={props.onSubjectInput}
+          onSubmit={props.onFieldSubmit}
+          textColor="#e5e7eb"
+          focusedTextColor="#e5e7eb"
+          cursorColor={cursor()}
+          backgroundColor="transparent"
+          focusedBackgroundColor="transparent"
+          flexGrow={1}
+          flexShrink={1}
+        />
+      </box>
       <box height={1} flexShrink={0} backgroundColor="#1f2937" />
-      <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0}>
-        {fieldRow("", props.body, props.field === "body", true)}
-      </scrollbox>
+      <box
+        flexDirection="column"
+        flexGrow={1}
+        flexShrink={1}
+        minHeight={0}
+        paddingLeft={1}
+        paddingRight={1}
+        backgroundColor={props.field === "body" ? "#1f2937" : "transparent"}
+      >
+        <textarea
+          ref={props.bodyRef}
+          focused={props.field === "body"}
+          onContentChange={props.onBodyChange}
+          textColor="#e5e7eb"
+          focusedTextColor="#e5e7eb"
+          cursorColor={cursor()}
+          backgroundColor="transparent"
+          focusedBackgroundColor="transparent"
+          flexGrow={1}
+          flexShrink={1}
+          minHeight={0}
+        />
+      </box>
     </box>
   );
 }
@@ -555,6 +684,8 @@ function App() {
   const [syncProgress, setSyncProgress] = createSignal<{ done: number; target: number } | null>(null);
   const [renderMode, setRenderMode] = createSignal<"text" | "w3m">("text");
   const [rendered, setRendered] = createSignal<string | null>(null);
+  const [w3mBusy, setW3mBusy] = createSignal(false);
+  const [staleLines, setStaleLines] = createSignal<string[] | null>(null);
 
   type PendingPatch = { read?: boolean; starred?: boolean; removed?: boolean };
   const [pending, setPending] = createSignal<Record<string, PendingPatch>>({});
@@ -582,16 +713,23 @@ function App() {
 
   const [composeOpen, setComposeOpen] = createSignal(false);
   const [composeField, setComposeField] = createSignal<ComposeField>("to");
-  const [composeTo, setComposeTo] = createSignal("");
-  const [composeSubject, setComposeSubject] = createSignal("");
-  const [composeBody, setComposeBody] = createSignal("");
+  let composeTo = "";
+  let composeSubject = "";
+  let composeBody = "";
+  let toInput: InputRenderable | undefined;
+  let subjectInput: InputRenderable | undefined;
+  let bodyArea: TextareaRenderable | undefined;
   const [composeSending, setComposeSending] = createSignal(false);
+  const showComposeSpinner = useDeferredShow(composeSending);
   const [composeStatus, setComposeStatus] = createSignal("tab field · ctrl+s send · esc close");
 
   function openCompose() {
-    setComposeTo("");
-    setComposeSubject("");
-    setComposeBody("");
+    composeTo = "";
+    composeSubject = "";
+    composeBody = "";
+    toInput?.setText("");
+    subjectInput?.setText("");
+    bodyArea?.setText("");
     setComposeField("to");
     setComposeStatus("tab field · ctrl+s send · esc close");
     setComposeOpen(true);
@@ -600,17 +738,6 @@ function App() {
   function closeCompose() {
     setComposeOpen(false);
     setComposeSending(false);
-  }
-
-  function composeGetter(f: ComposeField): string {
-    if (f === "to") return composeTo();
-    if (f === "subject") return composeSubject();
-    return composeBody();
-  }
-  function composeSetter(f: ComposeField, updater: (s: string) => string) {
-    if (f === "to") setComposeTo(updater(composeTo()));
-    else if (f === "subject") setComposeSubject(updater(composeSubject()));
-    else setComposeBody(updater(composeBody()));
   }
 
   function nextField(cur: ComposeField, reverse = false): ComposeField {
@@ -622,9 +749,9 @@ function App() {
 
   async function doSend() {
     if (composeSending()) return;
-    const to = composeTo().trim();
-    const subject = composeSubject().trim();
-    const text = composeBody();
+    const to = composeTo.trim();
+    const subject = composeSubject.trim();
+    const text = composeBody;
     if (!to) { setComposeStatus("error: recipient required"); setComposeField("to"); return; }
     if (!subject) { setComposeStatus("error: subject required"); setComposeField("subject"); return; }
     if (!text.trim()) { setComposeStatus("error: body required"); setComposeField("body"); return; }
@@ -648,6 +775,7 @@ function App() {
   const [searchSelected, setSearchSelected] = createSignal(0);
   const [searchPhase, setSearchPhase] = createSignal<"idle" | "searching" | "local-done" | "done" | "error">("idle");
   const [searchError, setSearchError] = createSignal<string | null>(null);
+  let searchInput: InputRenderable | undefined;
   let searchAbort: (() => void) | null = null;
   let searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -726,16 +854,12 @@ function App() {
           try {
             const hit = JSON.parse(data) as SearchHit;
             setSearchHits((prev) => [...prev, hit]);
-          } catch {
-            // ignore malformed
-          }
+          } catch {}
         } else if (type === "phase") {
           try {
             const p = JSON.parse(data) as { phase: string };
             if (p.phase === "local-done") setSearchPhase("local-done");
-          } catch {
-            // ignore
-          }
+          } catch {}
         } else if (type === "done") {
           setSearchPhase("done");
         } else if (type === "error") {
@@ -743,15 +867,19 @@ function App() {
             const p = JSON.parse(data) as { message: string };
             setSearchError(p.message);
             setSearchPhase("error");
+            flashToast(`search: ${p.message}`);
           } catch {
             setSearchError("unknown error");
             setSearchPhase("error");
+            flashToast("search: unknown error");
           }
         }
       },
       onError: (err) => {
-        setSearchError(err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        setSearchError(msg);
         setSearchPhase("error");
+        flashToast(`search: ${msg}`);
       },
     });
   }
@@ -788,11 +916,28 @@ function App() {
     return fetchBody(id);
   });
 
+  // Snapshot the currently-rendered body lines so we can keep them dimmed
+  // while the next message loads (instead of blanking the pane).
+  createEffect(() => {
+    const id = bodySource();
+    const b = body();
+    if (!id) {
+      setStaleLines(null);
+      return;
+    }
+    if (body.loading) return;
+    if (b) {
+      const text = b.text;
+      setStaleLines(text ? text.split("\n") : null);
+    }
+  });
+
   createEffect(() => {
     const id = bodySource();
     if (id) {
       setRenderMode("text");
       setRendered(null);
+      setW3mBusy(false);
     }
   });
 
@@ -832,12 +977,17 @@ function App() {
 
   async function runMutation(msg: Message, action: MutateAction) {
     const before = { read: msg.read, starred: msg.starred };
+    const willRemove = action === "archive" || action === "trash";
+    // Capture active-ness BEFORE mutating pending, otherwise filtering the
+    // removed row out of visibleMessages() shifts currentMsg() to a neighbour
+    // and the reader stays open on the wrong message.
+    const isActiveReader = willRemove && readerOpen() && currentMsg()?.gmMsgid === msg.gmMsgid;
+
     if (action === "toggle-read") patchPending(msg.gmMsgid, { read: !msg.read });
     else if (action === "toggle-star") patchPending(msg.gmMsgid, { starred: !msg.starred });
     else patchPending(msg.gmMsgid, { removed: true });
 
-    const willRemove = action === "archive" || action === "trash";
-    if (willRemove && readerOpen() && currentMsg()?.gmMsgid === msg.gmMsgid) {
+    if (isActiveReader) {
       setReaderOpen(false);
       setActiveMsg(null);
     }
@@ -866,6 +1016,31 @@ function App() {
     setTimeout(() => setToast((t) => (t === msg ? null : t)), ms);
   }
 
+  function triggerW3m() {
+    if (!caps()?.w3m) {
+      flashToast("w3m not installed — install to enable rich view");
+      return;
+    }
+    const b = body();
+    if (!b?.htmlPath) {
+      flashToast("no HTML part in this message");
+      return;
+    }
+    if (w3mBusy()) return;
+    setW3mBusy(true);
+    // Fire-and-forget: awaiting inside the keyboard handler freezes the TUI
+    // for the duration of the subprocess (500ms+ on big HTML).
+    void w3mDump(b.htmlPath)
+      .then((dump) => {
+        setRendered(dump);
+        setRenderMode("w3m");
+      })
+      .catch((err) => {
+        flashToast(`w3m failed: ${err instanceof Error ? err.message : String(err)}`);
+      })
+      .finally(() => setW3mBusy(false));
+  }
+
   onMount(() => {
     const url = `http://${DAEMON_DEFAULT_HOST}:${DAEMON_DEFAULT_PORT}/api/events`;
     const stop = subscribeSse(url, {
@@ -881,16 +1056,12 @@ function App() {
               void refetch();
             }
             void refetchFolders();
-          } catch {
-            // ignore
-          }
+          } catch {}
         } else if (type === "mail.updated") {
           try {
             const parsed = JSON.parse(data) as { gmMsgid?: string };
             if (parsed.gmMsgid) clearPending(parsed.gmMsgid);
-          } catch {
-            // ignore
-          }
+          } catch {}
           void refetch();
         } else if (type === "folder.sync.progress") {
           try {
@@ -901,45 +1072,33 @@ function App() {
               void refetch();
               setTimeout(() => setSyncProgress(null), 2500);
             }
-          } catch {
-            // ignore
-          }
+          } catch {}
         }
       },
     });
     onCleanup(stop);
   });
 
-  useKeyboard(async (e) => {
+  useKeyboard((e) => {
     const list = visibleMessages();
     const total = list.length;
 
+    // Compose: native input/textarea handle typing. We only intercept shortcuts.
     if (composeOpen()) {
       if (composeSending()) {
-        if (e.name === "escape") { closeCompose(); return; }
+        if (e.name === "escape") { e.preventDefault(); closeCompose(); }
         return;
       }
-      if (e.name === "escape") { closeCompose(); return; }
-      if (e.ctrl && (e.name === "s" || e.name === "return")) { void doSend(); return; }
-      if (e.name === "tab" && !e.shift) { setComposeField((f) => nextField(f)); return; }
-      if (e.name === "tab" && e.shift) { setComposeField((f) => nextField(f, true)); return; }
-
-      const f = composeField();
-      if (e.name === "backspace") {
-        if (e.meta) composeSetter(f, () => "");
-        else composeSetter(f, (s) => s.slice(0, -1));
+      if (e.name === "escape") { e.preventDefault(); closeCompose(); return; }
+      if (e.ctrl && (e.name === "s" || e.name === "return")) {
+        e.preventDefault();
+        void doSend();
         return;
       }
-      if (e.name === "space") { composeSetter(f, (s) => s + " "); return; }
-      if (e.name === "return") {
-        if (f === "body") composeSetter(f, (s) => s + "\n");
-        else setComposeField((cur) => nextField(cur));
+      if (e.name === "tab") {
+        e.preventDefault();
+        setComposeField((f) => nextField(f, e.shift));
         return;
-      }
-      const seq = (e as { sequence?: string }).sequence;
-      if (seq && seq.length === 1 && !e.ctrl && !e.meta) {
-        const code = seq.charCodeAt(0);
-        if (code >= 0x20 && code !== 0x7f) composeSetter(f, (s) => s + seq);
       }
       return;
     }
@@ -951,10 +1110,7 @@ function App() {
 
     if (sidebarFocused() && !readerOpen() && !searchOpen()) {
       const fs = orderedFolders();
-      if (e.name === "escape") {
-        setSidebarFocused(false);
-        return;
-      }
+      if (e.name === "escape") { setSidebarFocused(false); return; }
       if (e.name === "j" || e.name === "down") {
         setFolderSelected((s) => Math.min(Math.max(0, fs.length - 1), s + 1));
         return;
@@ -971,38 +1127,23 @@ function App() {
       return;
     }
 
+    // Search: native input handles typing; only intercept non-char keys.
     if (searchOpen() && !readerOpen()) {
-      if (e.name === "escape") {
-        closeSearch();
-        return;
-      }
+      if (e.name === "escape") { e.preventDefault(); closeSearch(); return; }
       if (e.name === "return") {
-        await openSelectedHit();
+        e.preventDefault();
+        void openSelectedHit();
         return;
       }
       if (e.name === "down" || (e.ctrl && e.name === "j")) {
+        e.preventDefault();
         setSearchSelected((s) => Math.min(Math.max(0, searchHits().length - 1), s + 1));
         return;
       }
       if (e.name === "up" || (e.ctrl && e.name === "k")) {
+        e.preventDefault();
         setSearchSelected((s) => Math.max(0, s - 1));
         return;
-      }
-      if (e.name === "backspace") {
-        if (e.meta) setSearchQuery("");
-        else setSearchQuery((q) => q.slice(0, -1));
-        return;
-      }
-      if (e.name === "space") {
-        setSearchQuery((q) => q + " ");
-        return;
-      }
-      const seq = (e as { sequence?: string }).sequence;
-      if (seq && seq.length === 1 && !e.ctrl && !e.meta) {
-        const code = seq.charCodeAt(0);
-        if (code >= 0x20 && code !== 0x7f) {
-          setSearchQuery((q) => q + seq);
-        }
       }
       return;
     }
@@ -1023,30 +1164,12 @@ function App() {
         }
       }
       if (e.name === "v" && !e.shift && !e.ctrl && !e.meta) {
-        const b = body();
-        if (!caps()?.w3m) {
-          flashToast("w3m not installed — install to enable rich view");
-          return;
-        }
-        if (!b?.htmlPath) {
-          flashToast("no HTML part in this message");
-          return;
-        }
-        try {
-          const dump = await w3mDump(b.htmlPath);
-          setRendered(dump);
-          setRenderMode("w3m");
-        } catch (err) {
-          flashToast(`w3m failed: ${err instanceof Error ? err.message : String(err)}`);
-        }
+        triggerW3m();
         return;
       }
       if (e.name === "v" && e.shift) {
         const b = body();
-        if (!b?.htmlPath) {
-          flashToast("no HTML part to open");
-          return;
-        }
+        if (!b?.htmlPath) { flashToast("no HTML part to open"); return; }
         openInBrowser(b.htmlPath);
         flashToast("opened in browser");
         return;
@@ -1067,7 +1190,7 @@ function App() {
       return;
     }
     if (e.name === "r" && !e.ctrl && !e.meta) {
-      await refetch();
+      void refetch();
       return;
     }
     if (!total) return;
@@ -1208,12 +1331,17 @@ function App() {
             fallback={
               <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
                 <ComposeOverlay
-                  to={composeTo()}
-                  subject={composeSubject()}
-                  body={composeBody()}
                   field={composeField()}
                   sending={composeSending()}
+                  showSpinner={showComposeSpinner()}
                   statusLine={composeStatus()}
+                  onToInput={(v) => { composeTo = v; }}
+                  onSubjectInput={(v) => { composeSubject = v; }}
+                  onBodyChange={() => { composeBody = bodyArea?.plainText ?? ""; }}
+                  onFieldSubmit={() => setComposeField((f) => nextField(f))}
+                  toRef={(r) => { toInput = r; }}
+                  subjectRef={(r) => { subjectInput = r; }}
+                  bodyRef={(r) => { bodyArea = r; }}
                 />
               </box>
             }
@@ -1233,11 +1361,13 @@ function App() {
               }
             >
               <SearchOverlay
-                query={searchQuery()}
                 hits={searchHits()}
                 selected={searchSelected()}
                 phase={searchPhase()}
                 errorMessage={searchError()}
+                hasQuery={searchQuery() !== ""}
+                onInput={setSearchQuery}
+                inputRef={(r) => { searchInput = r; }}
               />
             </Show>
           </box>
@@ -1250,6 +1380,8 @@ function App() {
               error={body.error}
               rendered={rendered()}
               renderMode={renderMode()}
+              w3mBusy={w3mBusy()}
+              staleLines={staleLines()}
             />
           </Show>
           </Show>
@@ -1281,9 +1413,11 @@ function App() {
             </Match>
           </Switch>
         </text>
-        <text fg="#ef4444" paddingRight={2}>
-          sel={selected()} top={debugTop()} view={debugView()} sh={debugSh()} ref={debugRef() ? "y" : "n"}
-        </text>
+        <Show when={DEBUG}>
+          <text fg="#ef4444" paddingRight={2}>
+            sel={selected()} top={debugTop()} view={debugView()} sh={debugSh()} ref={debugRef() ? "y" : "n"}
+          </text>
+        </Show>
         <text fg="#4b5563">ctrl+c exit</text>
       </box>
     </box>
