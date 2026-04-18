@@ -13,6 +13,26 @@ import { Elysia } from "elysia";
 
 const { GRACE_HOST, GRACE_PORT, GRACE_DATA_DIR } = env();
 
+async function probeExistingDaemon(): Promise<boolean> {
+  try {
+    const res = await fetch(`http://${GRACE_HOST}:${GRACE_PORT}/api/health`, {
+      signal: AbortSignal.timeout(500),
+    });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { name?: string };
+    return body?.name === "grace";
+  } catch {
+    return false;
+  }
+}
+
+if (await probeExistingDaemon()) {
+  console.log(
+    `grace daemon already running on http://${GRACE_HOST}:${GRACE_PORT} — exiting this instance to avoid duplicate IDLE connections`,
+  );
+  process.exit(0);
+}
+
 openDb(`${GRACE_DATA_DIR}/grace.db`);
 getCapabilities();
 
@@ -102,3 +122,4 @@ async function shutdown(signal: string) {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGHUP", () => shutdown("SIGHUP"));

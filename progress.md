@@ -4,7 +4,21 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 ## Timeline
 
-### 2026-04-18 (latest) — M5/M5c polish + diagnostics
+### 2026-04-18 (latest) — M7 folder sidebar + lazy bootstrap
+
+- **M7.** Left sidebar (22 cols) renders the live Gmail folder list from `/api/folders` (which now calls `client.list({ statusQuery: { messages, unseen } })` and merges with SQLite tracked-state; 60s cache with `?refresh=1` bust). Folders sorted INBOX → special-use → user labels. Unread counts in blue. Tab toggles focus between sidebar and list; j/k navigates folders; Enter activates.
+- **Lazy bootstrap.** `POST /api/folders/:name/activate` coalesces concurrent calls via a per-folder promise cache. First activate: spawns a fresh IMAP connection, `bootstrapFolder` pulls 500 headers, then fires `runBackfill` to 1000 in the background (guarded against double-fire by a module-scope `Set`). Publishes `folder.sync.progress` + `folder.synced` on the existing bus.
+- **TUI switch flow.** `activeFolder` signal drives `createResource(fetchMessages)`, so changing folder auto-refetches. Switch clears pending mutation overlay, selection, reader, and any active search. `folder.sync.progress` events filter to active folder so the pill isn't hijacked by background backfill elsewhere. `mail.received` only triggers list refetch when its `folder` matches active; folder list always refreshes so unread counts stay fresh.
+- **Scoped smaller than plan.** IDLE stays pinned to INBOX — non-INBOX folders require manual `r` refresh for new mail. Gmail's 15-conn cap + dev-reload churn argued against per-folder IDLE in this pass. Label pills and `l`-move mutation also deferred (cosmetic + needs picker).
+
+### 2026-04-18 — M6 mutations (read/star/archive/trash)
+
+- **M6.** `POST /api/messages/:gmMsgid/mutate` + `packages/mail/mutations.ts` landed. `applyMutation` uses `messageFlagsAdd/Remove` (`\Seen` / `\Flagged`) for read/star, and `messageMove` to `[Gmail]/All Mail` / `[Gmail]/Trash` for archive/trash. Route is server-authoritative: IMAP first, then SQLite delete-or-update, then `mail.updated` fan-out. Move success deletes the row and the `bodies` cascade handles the text/html/eml blobs.
+- **TUI optimistic overlay.** New `pending: Record<gmMsgid, {read?, starred?, removed?}>` signal layered on top of `messages()` via `visibleMessages()`. Archive/trash hide the row instantly; read/star flip the column instantly. Overlay clears on the SSE `mail.updated` for that `gmMsgid` (list refetch returns authoritative state). On mutation failure we roll back + flash a toast.
+- **Keybinds.** `m` toggle read, `s` toggle star, `e` archive, `#` trash — working from both the list and an open reader. Archiving/trashing the currently-open message also closes the reader. Help bar updated for both modes.
+- **Deferred.** `l <label>` move pushed to after M7 (needs folder picker + imapflow doesn't expose `X-GM-LABELS` high-level; revisit with `client.exec` or folder-as-label moves).
+
+### 2026-04-18 — M5/M5c polish + diagnostics
 
 - **Search first-char drop fixed.** Dropped opentui's `<input>` primitive for the search overlay; `searchQuery` is now driven directly from `useKeyboard` via `e.sequence` for printable chars + explicit handling for `backspace` (meta-backspace clears), `space`, and nav keys. Guarantees the `/` → first-keystroke transition doesn't lose a char, and sidesteps a focus-timing race where the input mounted after the next key arrived. Cursor rendered as `▌`.
 - **HTML-only emails now render usable text.** Added `html-to-text` (server-side) in `@grace/mail`: `deriveTextFromHtml` + `isTextUseful` helpers. `fetchMessageBody` calls it when the parsed `text` is empty or <20 chars but HTML is present. The body route also re-derives on cache hits (backfilling SQLite) so already-cached marketing mail re-renders without a refetch. The "(no plain-text part)" fallback now only shows for genuinely empty messages.
@@ -54,9 +68,7 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 - **Can't act on messages.** Archive / star / trash / reply / compose all absent; only opening-flips-read works. Fix in M6 + M8.
 - **Search is INBOX-only and cap 50 remote UIDs.** No folder selector, no `[Gmail]/All Mail` crawl, no FTS5 yet. M5c-04 + M7 lift these.
 - **Search local phase uses `LIKE '%q%'`.** Doesn't parse Gmail operators (`from:x is:unread older_than:30d`) locally — those just go through to the remote phase. FTS5 virtual table over bodies is M5c-04.
-- **TUI dev server can hold stale IMAP connections.** Each `bun --hot` reload opens IDLE + backfill + action-client; Gmail caps at 15. Killing + waiting ~60s clears it.
-- **IMAP connection churn on dev restart.** Each `bun --hot` reload opens fresh IDLE + action + backfill connections; Gmail caps at 15 concurrent and will `NO [ALERT] Too many simultaneous connections` for a few minutes if you restart too often. The server log now surfaces this explicitly instead of just "Command failed". Mitigation until M12 reconnect lands: `pkill -f "bun.*grace"; pkill -f "turbo.*-F server"` then wait ~60s for Gmail to release slots.
-- **`bun --hot` kills IDLE on every server save.** Dev-time only; IDLE comes back up in ~1s after restart.
+- **IMAP connection churn on dev restart.** Gmail caps at 15 concurrent. Mitigated by (1) port guard — `apps/server/src/index.ts` probes `/api/health` on boot and exits if a daemon is already running, so a second `bun run dev:server` can't silently pile on IDLE connections; (2) SIGHUP shutdown handler, so closing a terminal releases the slot cleanly; (3) switched server dev from `bun --hot` to `bun --watch` so each save does a full SIGTERM → clean logout → fresh IDLE instead of leaking the old one. If you do end up with stragglers: `ps -eo pid,etime,command | grep -E 'turbo.*-F server|apps/server/src/index'` then kill the PIDs.
 - **Reader body long lines clip instead of wrapping.** Good enough for real email (most lines are &lt;80 cols); press `V` to open in browser if a message has pathological single-line HTML stripped to one row. Real word-wrap is future polish.
 - **Backfill is single-folder.** Only INBOX backfills today. Multi-folder comes with M7.
 - **Pre-existing imapflow type friction.** `bootstrap.ts` and `idle.ts` have residual `error TS2339` on `msg.emailId` / `from.mailbox|host` — runtime fine, types lag. Left untouched until it causes a problem.
@@ -70,10 +82,10 @@ grace/
 │   ├── server/  — Elysia daemon, starts IDLE on boot, hosts /api/*
 │   └── tui/     — opentui+Solid client, fetch-SSE, Eden-typed calls
 ├── packages/
-│   ├── api/     — Elysia routes (auth, folders, messages, body, capabilities, search, import, events) + bus + imap-action singleton
+│   ├── api/     — Elysia routes (auth, folders, activate, messages, body, mutate, capabilities, search, import, events) + bus + imap-action singleton
 │   ├── auth/    — OAuth2 flow + keychain + refresh helper
 │   ├── db/      — Drizzle schema (folders, messages, bodies) + bun:sqlite client
-│   ├── mail/    — IMAP client + bootstrap + IDLE + backfill + fetch-body + shared persist helper
+│   ├── mail/    — IMAP client + bootstrap + IDLE + backfill + fetch-body + mutations + list-folders + shared persist helper
 │   ├── env/     — zod-validated env
 │   └── config/  — shared tsconfig base
 └── docs: prd.md · plan.md · progress.md · research.md · README.md
@@ -94,4 +106,4 @@ Smoke tests:
 
 ## Next
 
-M6 — mutations (archive / mark-read / star / trash / move), optimistic UI with IMAP reconcile. Then M7 (folder sidebar + per-folder IDLE/backfill/search).
+M8 — compose + SMTP send. Keep M7 follow-ups (per-folder IDLE, label pills, `l` move) parked until M12 lands connection lifecycle / reconnect.

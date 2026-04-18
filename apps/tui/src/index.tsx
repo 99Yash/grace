@@ -39,10 +39,31 @@ async function fetchAuth() {
   return r.data;
 }
 
-async function fetchMessages(): Promise<Message[]> {
-  const r = await client.api.messages.get({ query: { folder: "INBOX", limit: "1000" } });
+async function fetchMessages(folder: string): Promise<Message[]> {
+  const r = await client.api.messages.get({ query: { folder, limit: "1000" } });
   if (r.error) throw r.error;
   return (r.data?.messages ?? []) as Message[];
+}
+
+type Folder = {
+  path: string;
+  name: string;
+  specialUse: string | null;
+  noSelect: boolean;
+  messages: number | null;
+  unseen: number | null;
+  tracked: boolean;
+};
+
+async function fetchFolders(refresh = false): Promise<Folder[]> {
+  const r = await client.api.folders.get({ query: refresh ? { refresh: "1" } : {} });
+  if (r.error) throw r.error;
+  return ((r.data as { folders?: Folder[] })?.folders ?? []).filter((f) => !f.noSelect);
+}
+
+async function activateFolder(path: string): Promise<void> {
+  const r = await client.api.folders({ name: path }).activate.post();
+  if (r.error) throw r.error;
 }
 
 async function fetchCapabilities(): Promise<Capabilities> {
@@ -55,6 +76,14 @@ async function fetchBody(gmMsgid: string): Promise<Body> {
   const r = await client.api.messages({ gmMsgid }).body.get();
   if (r.error) throw r.error;
   return r.data as Body;
+}
+
+type MutateAction = "toggle-read" | "toggle-star" | "archive" | "trash";
+
+async function mutateMessage(gmMsgid: string, action: MutateAction): Promise<{ removed: boolean }> {
+  const r = await client.api.messages({ gmMsgid }).mutate.post({ action });
+  if (r.error) throw r.error;
+  return { removed: Boolean((r.data as { removed?: boolean })?.removed) };
 }
 
 async function importHit(hit: SearchHit): Promise<void> {
@@ -361,10 +390,82 @@ function SearchOverlay(props: {
   );
 }
 
+const SPECIAL_ORDER: Record<string, number> = {
+  "\\Important": 2,
+  "\\Flagged": 3,
+  "\\Drafts": 4,
+  "\\Sent": 5,
+  "\\All": 6,
+  "\\Junk": 7,
+  "\\Trash": 8,
+};
+
+function orderFolders(fs: Folder[]): Folder[] {
+  const rank = (f: Folder): number => {
+    if (f.path === "INBOX") return 1;
+    if (f.specialUse && f.specialUse in SPECIAL_ORDER) return SPECIAL_ORDER[f.specialUse]!;
+    return 9;
+  };
+  return [...fs].sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    return a.path.localeCompare(b.path);
+  });
+}
+
+function FolderRow(props: { folder: Folder; selected: boolean; focused: boolean }) {
+  const fg = () =>
+    props.focused && props.selected
+      ? "#ffffff"
+      : props.selected
+        ? "#d1d5db"
+        : "#9ca3af";
+  const countFg = () => ((props.folder.unseen ?? 0) > 0 ? "#4da3ff" : "#4b5563");
+  const label = () => {
+    if (props.folder.path === "INBOX") return "Inbox";
+    if (props.folder.specialUse === "\\All") return "All Mail";
+    if (props.folder.specialUse === "\\Sent") return "Sent";
+    if (props.folder.specialUse === "\\Drafts") return "Drafts";
+    if (props.folder.specialUse === "\\Trash") return "Trash";
+    if (props.folder.specialUse === "\\Junk") return "Spam";
+    if (props.folder.specialUse === "\\Flagged") return "Starred";
+    if (props.folder.specialUse === "\\Important") return "Important";
+    return props.folder.name;
+  };
+  return (
+    <box
+      flexDirection="row"
+      height={1}
+      flexShrink={0}
+      overflow="hidden"
+      paddingLeft={1}
+      paddingRight={1}
+      backgroundColor={
+        props.selected ? (props.focused ? "#1f3a5f" : "#1f2937") : "transparent"
+      }
+    >
+      <text fg={fg()} flexGrow={1} flexShrink={1}>
+        {truncate(label(), 18)}
+      </text>
+      <Show when={(props.folder.unseen ?? 0) > 0}>
+        <text fg={countFg()} flexShrink={0}>
+          {props.folder.unseen}
+        </text>
+      </Show>
+    </box>
+  );
+}
+
 function App() {
   const [auth] = createResource(fetchAuth);
   const [caps] = createResource(fetchCapabilities);
-  const [messages, { refetch }] = createResource(fetchMessages);
+  const [activeFolder, setActiveFolder] = createSignal("INBOX");
+  const [folders, { refetch: refetchFolders }] = createResource(() => fetchFolders(false));
+  const orderedFolders = () => orderFolders(folders() ?? []);
+  const [sidebarFocused, setSidebarFocused] = createSignal(false);
+  const [folderSelected, setFolderSelected] = createSignal(0);
+  const [messages, { refetch }] = createResource(activeFolder, fetchMessages);
   const [selected, setSelected] = createSignal(0);
   const [readerOpen, setReaderOpen] = createSignal(false);
   const [activeMsg, setActiveMsg] = createSignal<Message | null>(null);
@@ -375,6 +476,30 @@ function App() {
   const [syncProgress, setSyncProgress] = createSignal<{ done: number; target: number } | null>(null);
   const [renderMode, setRenderMode] = createSignal<"text" | "w3m">("text");
   const [rendered, setRendered] = createSignal<string | null>(null);
+
+  type PendingPatch = { read?: boolean; starred?: boolean; removed?: boolean };
+  const [pending, setPending] = createSignal<Record<string, PendingPatch>>({});
+
+  function patchPending(gmMsgid: string, patch: PendingPatch) {
+    setPending((prev) => ({ ...prev, [gmMsgid]: { ...(prev[gmMsgid] ?? {}), ...patch } }));
+  }
+  function clearPending(gmMsgid: string) {
+    setPending((prev) => {
+      if (!(gmMsgid in prev)) return prev;
+      const next = { ...prev };
+      delete next[gmMsgid];
+      return next;
+    });
+  }
+  function applyPending(msg: Message): Message {
+    const patch = pending()[msg.gmMsgid];
+    if (!patch) return msg;
+    return {
+      ...msg,
+      read: patch.read ?? msg.read,
+      starred: patch.starred ?? msg.starred,
+    };
+  }
 
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
@@ -399,11 +524,20 @@ function App() {
     };
   }
 
+  const visibleMessages = (): Message[] => {
+    const list = messages();
+    if (!list) return [];
+    const p = pending();
+    return list
+      .filter((m) => !p[m.gmMsgid]?.removed)
+      .map((m) => applyPending(m));
+  };
+
   const currentMsg = (): Message | null => {
     const override = activeMsg();
-    if (override) return override;
-    const list = messages();
-    if (!list || list.length === 0) return null;
+    if (override) return applyPending(override);
+    const list = visibleMessages();
+    if (list.length === 0) return null;
     return list[selected()] ?? null;
   };
 
@@ -522,11 +656,69 @@ function App() {
   });
 
   createEffect(() => {
-    const list = messages();
-    if (!list) return;
-    setLastUpdated(Date.now());
+    const list = visibleMessages();
+    if (messages()) setLastUpdated(Date.now());
     if (selected() >= list.length) setSelected(Math.max(0, list.length - 1));
   });
+
+  async function switchFolder(path: string) {
+    if (path === activeFolder()) {
+      setSidebarFocused(false);
+      return;
+    }
+    setPending({});
+    setSelected(0);
+    setReaderOpen(false);
+    setActiveMsg(null);
+    closeSearch();
+    setActiveFolder(path);
+    setSidebarFocused(false);
+    try {
+      await activateFolder(path);
+      void refetch();
+      void refetchFolders();
+    } catch (err) {
+      flashToast(`activate failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  createEffect(() => {
+    const list = orderedFolders();
+    if (list.length === 0) return;
+    const idx = list.findIndex((f) => f.path === activeFolder());
+    if (idx >= 0) setFolderSelected(idx);
+  });
+
+  async function runMutation(msg: Message, action: MutateAction) {
+    const before = { read: msg.read, starred: msg.starred };
+    if (action === "toggle-read") patchPending(msg.gmMsgid, { read: !msg.read });
+    else if (action === "toggle-star") patchPending(msg.gmMsgid, { starred: !msg.starred });
+    else patchPending(msg.gmMsgid, { removed: true });
+
+    const willRemove = action === "archive" || action === "trash";
+    if (willRemove && readerOpen() && currentMsg()?.gmMsgid === msg.gmMsgid) {
+      setReaderOpen(false);
+      setActiveMsg(null);
+    }
+
+    try {
+      await mutateMessage(msg.gmMsgid, action);
+      flashToast(toastFor(action));
+    } catch (err) {
+      patchPending(msg.gmMsgid, { read: before.read, starred: before.starred, removed: false });
+      clearPending(msg.gmMsgid);
+      flashToast(`${action} failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  function toastFor(a: MutateAction): string {
+    switch (a) {
+      case "archive": return "archived";
+      case "trash": return "moved to trash";
+      case "toggle-read": return "toggled read";
+      case "toggle-star": return "toggled star";
+    }
+  }
 
   function flashToast(msg: string, ms = 2500) {
     setToast(msg);
@@ -541,19 +733,29 @@ function App() {
       onEvent: (type, data) => {
         if (type === "mail.received") {
           try {
-            const parsed = JSON.parse(data) as { subject: string | null };
-            setNewFlash(`new: ${parsed.subject ?? "(no subject)"}`);
-            setTimeout(() => setNewFlash(null), 4000);
+            const parsed = JSON.parse(data) as { folder: string; subject: string | null };
+            if (parsed.folder === activeFolder()) {
+              setNewFlash(`new: ${parsed.subject ?? "(no subject)"}`);
+              setTimeout(() => setNewFlash(null), 4000);
+              void refetch();
+            }
+            void refetchFolders();
+          } catch {
+            // ignore
+          }
+        } else if (type === "mail.updated") {
+          try {
+            const parsed = JSON.parse(data) as { gmMsgid?: string };
+            if (parsed.gmMsgid) clearPending(parsed.gmMsgid);
           } catch {
             // ignore
           }
           void refetch();
-        } else if (type === "mail.updated") {
-          void refetch();
         } else if (type === "folder.sync.progress") {
           try {
-            const parsed = JSON.parse(data) as { done: number; target: number };
-            setSyncProgress(parsed);
+            const parsed = JSON.parse(data) as { folder: string; done: number; target: number };
+            if (parsed.folder !== activeFolder()) return;
+            setSyncProgress({ done: parsed.done, target: parsed.target });
             if (parsed.done >= parsed.target) {
               void refetch();
               setTimeout(() => setSyncProgress(null), 2500);
@@ -568,8 +770,35 @@ function App() {
   });
 
   useKeyboard(async (e) => {
-    const list = messages();
-    const total = list?.length ?? 0;
+    const list = visibleMessages();
+    const total = list.length;
+
+    if (e.name === "tab" && !searchOpen() && !readerOpen()) {
+      setSidebarFocused((f) => !f);
+      return;
+    }
+
+    if (sidebarFocused() && !readerOpen() && !searchOpen()) {
+      const fs = orderedFolders();
+      if (e.name === "escape") {
+        setSidebarFocused(false);
+        return;
+      }
+      if (e.name === "j" || e.name === "down") {
+        setFolderSelected((s) => Math.min(Math.max(0, fs.length - 1), s + 1));
+        return;
+      }
+      if (e.name === "k" || e.name === "up") {
+        setFolderSelected((s) => Math.max(0, s - 1));
+        return;
+      }
+      if (e.name === "return") {
+        const picked = fs[folderSelected()];
+        if (picked) void switchFolder(picked.path);
+        return;
+      }
+      return;
+    }
 
     if (searchOpen() && !readerOpen()) {
       if (e.name === "escape") {
@@ -612,6 +841,15 @@ function App() {
         setReaderOpen(false);
         setActiveMsg(null);
         return;
+      }
+      if (!e.ctrl && !e.meta) {
+        const m = currentMsg();
+        if (m) {
+          if (e.name === "m" && !e.shift) { void runMutation(m, "toggle-read"); return; }
+          if (e.name === "s" && !e.shift) { void runMutation(m, "toggle-star"); return; }
+          if (e.name === "e" && !e.shift) { void runMutation(m, "archive"); return; }
+          if (e.name === "#" || (e.shift && e.name === "3")) { void runMutation(m, "trash"); return; }
+        }
       }
       if (e.name === "v" && !e.shift && !e.ctrl && !e.meta) {
         const b = body();
@@ -669,6 +907,13 @@ function App() {
     } else if (e.name === "return") {
       setActiveMsg(null);
       setReaderOpen(true);
+    } else if (!e.ctrl && !e.meta) {
+      const m = list[selected()];
+      if (!m) return;
+      if (e.name === "m" && !e.shift) { void runMutation(m, "toggle-read"); return; }
+      if (e.name === "s" && !e.shift) { void runMutation(m, "toggle-star"); return; }
+      if (e.name === "e" && !e.shift) { void runMutation(m, "archive"); return; }
+      if (e.name === "#" || (e.shift && e.name === "3")) { void runMutation(m, "trash"); return; }
     }
   });
 
@@ -705,7 +950,7 @@ function App() {
         backgroundColor="#111827"
       >
         <text fg="#9ca3af" flexGrow={1}>
-          INBOX{messages() ? ` · ${messages()!.length}` : ""}
+          {activeFolder()}{messages() ? ` · ${visibleMessages().length}` : ""}
         </text>
         <Show when={syncProgress()}>
           <text fg="#60a5fa" paddingRight={2}>
@@ -734,7 +979,7 @@ function App() {
         </text>
       </box>
 
-      {/* List + optional reader */}
+      {/* Sidebar + list + optional reader */}
       <Show
         when={messages()}
         fallback={
@@ -746,6 +991,45 @@ function App() {
         <box flexDirection="row" flexGrow={1} flexShrink={1} minHeight={0}>
           <box
             flexDirection="column"
+            width={22}
+            flexShrink={0}
+            minHeight={0}
+            overflow="hidden"
+            backgroundColor={sidebarFocused() ? "#0f172a" : "#0b1220"}
+          >
+            <box
+              flexDirection="row"
+              height={1}
+              flexShrink={0}
+              paddingLeft={1}
+              paddingRight={1}
+              backgroundColor={sidebarFocused() ? "#1e293b" : "#111827"}
+            >
+              <text fg={sidebarFocused() ? "#ffffff" : "#9ca3af"} flexGrow={1}>
+                folders
+              </text>
+            </box>
+            <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0}>
+              <For each={orderedFolders()} fallback={
+                <box padding={1}><text fg="#6b7280">loading…</text></box>
+              }>
+                {(f, i) => (
+                  <FolderRow
+                    folder={f}
+                    selected={
+                      sidebarFocused()
+                        ? folderSelected() === i()
+                        : f.path === activeFolder()
+                    }
+                    focused={sidebarFocused()}
+                  />
+                )}
+              </For>
+            </scrollbox>
+          </box>
+          <box width={1} flexShrink={0} backgroundColor="#1f2937" />
+          <box
+            flexDirection="column"
             flexGrow={readerOpen() ? 0 : 1}
             flexShrink={1}
             minHeight={0}
@@ -755,7 +1039,7 @@ function App() {
             <Show
               when={searchOpen()}
               fallback={
-                <InboxList messages={messages()!} selected={selected} compact={readerOpen()} />
+                <InboxList messages={visibleMessages()} selected={selected} compact={readerOpen()} />
               }
             >
               <SearchOverlay
@@ -791,12 +1075,15 @@ function App() {
         backgroundColor="#0b1220"
       >
         <text fg="#4b5563" flexGrow={1}>
-          <Switch fallback="j/k nav · / search · enter open · r refresh">
+          <Switch fallback="tab folders · j/k nav · enter open · m read · s star · e archive · # trash · / search">
+            <Match when={sidebarFocused()}>
+              j/k nav · enter switch · tab/esc back to list
+            </Match>
             <Match when={searchOpen() && !readerOpen()}>
               type to search · ↑↓ nav · enter open · esc cancel
             </Match>
             <Match when={readerOpen()}>
-              j/k nav{caps()?.w3m ? " · v rich" : ""} · V browser · t text · esc close
+              m read · s star · e archive · # trash{caps()?.w3m ? " · v rich" : ""} · V browser · t text · esc close
             </Match>
           </Switch>
         </text>

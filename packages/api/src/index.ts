@@ -1,10 +1,12 @@
 import { Elysia } from "elysia";
+import { activateRoutes } from "./routes/activate.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { bodyRoutes } from "./routes/body.ts";
 import { capabilityRoutes } from "./routes/capabilities.ts";
 import { eventRoutes } from "./routes/events.ts";
 import { folderRoutes } from "./routes/folders.ts";
 import { messageRoutes } from "./routes/messages.ts";
+import { mutateRoutes } from "./routes/mutate.ts";
 import { importRoutes } from "./routes/import.ts";
 import { searchRoutes } from "./routes/search.ts";
 
@@ -17,8 +19,10 @@ export const app = new Elysia({ prefix: "/api" })
   .use(authRoutes)
   .use(capabilityRoutes)
   .use(folderRoutes)
+  .use(activateRoutes)
   .use(messageRoutes)
   .use(bodyRoutes)
+  .use(mutateRoutes)
   .use(importRoutes)
   .use(searchRoutes)
   .use(eventRoutes);

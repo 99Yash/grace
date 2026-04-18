@@ -13,8 +13,8 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M5 | Message reader | ✅ done | Enter opens body; hybrid bodies (SQLite text + disk HTML/raw); HTML→text server-side fallback for marketing mail; `v` w3m (capability-gated) / `V` browser-eject; local read-flip |
 | M5b | Partial sync + progressive backfill | ✅ done | 1000-msg backfill worker, sync progress pill, `persist.ts` extraction, `/api/capabilities` |
 | M5c | Two-phase search (local + remote) | ✅ done | SQLite LIKE + Gmail `X-GM-RAW` stream-merge, `/` overlay (manual keystroke handling, no dropped first char), opportunistic import on remote-only open |
-| M6 | Mutations (archive / read / star / trash) | ⬜ next | optimistic UI, IMAP reconcile |
-| M7 | Folder sidebar + label pills | ⬜ | switch folders/labels; per-folder IDLE workers |
+| M6 | Mutations (archive / read / star / trash) | 🟡 partial | optimistic UI + IMAP via `applyMutation`; label-move deferred to M7 |
+| M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; per-folder IDLE + label pills deferred |
 | M8 | Compose + SMTP send | ⬜ | draft queue, nodemailer, optimistic send |
 | M9 | Triage mode | ⬜ | fullscreen one-at-a-time, space-bar through inbox |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
@@ -55,22 +55,27 @@ Landed: `/` opens a search overlay, typing (200ms debounce) kicks a per-query SS
 - **M5c-03 ✅** Opportunistic import — `POST /api/messages/import` accepts a `SearchHit` body and inserts via the same row shape as backfill. TUI only calls it when the Entered hit is `inLocal=false`; otherwise it jumps straight to the reader. Reader now has an `activeMsg` override so search-initiated reads don't need the message to live in the main list first.
 - **M5c-04** (deferred) FTS5 virtual table over `messages(subject, snippet)` + `bodies(text)` for phrase search + ranking. `bodies` schema was shaped in M5 to make this a one-liner later.
 
-## M6 — Mutations
+## M6 — Mutations (partial)
 
-`archive`, `mark read/unread`, `star/unstar`, `trash`, `move to label`.
+Landed: `archive`, `toggle read`, `toggle star`, `trash`. Server-authoritative: POST hits IMAP first, then updates SQLite + publishes `mail.updated`. TUI keeps its own optimistic overlay keyed by `gmMsgid` for instant visual response; overlay clears when the mail.updated SSE arrives.
 
-- **M6-01** `POST /api/messages/:id/mutate` route — accepts `{ action: "archive" | "read" | ... }`.
-- **M6-02** `packages/mail/mutations.ts` — implements each as IMAP ops (`store +flags`, `move`, label add/remove).
-- **M6-03** TUI optimistic UI: local SQLite update → bus event → visual change immediately, server POST in background.
-- **M6-04** Reconcile on error: rollback local state + show toast.
-- **M6-05** Keybinds: `e` archive, `m` toggle read, `s` star, `#` trash, `l <label>` move.
+- **M6-01 ✅** `POST /api/messages/:gmMsgid/mutate` route — accepts `{ action: "read" | "unread" | "star" | "unstar" | "toggle-read" | "toggle-star" | "archive" | "trash" }`.
+- **M6-02 ✅** `packages/mail/mutations.ts` — `applyMutation(client, {folderName, uid}, action)`. Read/star are `messageFlagsAdd/Remove` with `\Seen` / `\Flagged`; archive/trash are `messageMove` to `[Gmail]/All Mail` / `[Gmail]/Trash`. On successful move, the route deletes the row from SQLite (cascade to `bodies`).
+- **M6-03 ✅** TUI optimistic overlay — `pending: Record<gmMsgid, {read?, starred?, removed?}>` signal layered over the messages list via `visibleMessages()`. `runMutation()` patches overlay → posts → clears on success (or rolls back + toast on failure). Also short-circuits reader close when the open message is archived/trashed.
+- **M6-04 ✅** Reconcile on error: rollback + toast. SSE `mail.updated` also clears pending for that `gmMsgid` (list refetch returns authoritative state).
+- **M6-05 ✅** Keybinds from list view AND reader view: `m` toggle read, `s` toggle star, `e` archive, `#` trash. Help bar updated.
+- **Deferred** `l <label>` move — needs folder/label picker; revisit after M7's folder sidebar. Gmail label add/remove via `X-GM-LABELS` STORE isn't exposed by imapflow high-level API; either drop to `client.exec` or simulate via MOVE between label folders.
 
-## M7 — Folder sidebar + label pills
+## M7 — Folder sidebar + label pills (partial)
 
-- Left column with folders from `/api/folders`.
-- Per-folder IDLE worker spawned on-demand when user selects the folder.
-- `Tab` toggles focus between sidebar ↔ list.
-- Label pills rendered in each row (especially user's `1: urgent`–`10: marketing` system).
+Landed: live Gmail folder list drives a left sidebar. Tab toggles sidebar ↔ list focus. Enter on a folder lazily bootstraps it (500 headers via a fresh client), then kicks off backfill to 1000. IDLE stays pinned to INBOX — non-INBOX folders don't auto-update (press `r` to refresh). This is the pragmatic slice: Gmail caps at 15 concurrent connections and dev reloads already push us close, so per-folder IDLE is deferred until we also handle connection lifecycle + reconnect (M12).
+
+- **M7-01 ✅** `GET /api/folders` does `client.list({ statusQuery: { messages, unseen } })` via the action-client, merges with SQLite tracked-state, caches for 60s (`?refresh=1` to bust). Falls back to SQLite-only rows if IMAP fails.
+- **M7-02 ✅** `POST /api/folders/:name/activate` — per-folder promise cache to coalesce concurrent requests. If local count is 0, runs `bootstrapFolder` on a fresh client. Kicks off `runBackfill` in background once per folder for the server's lifetime. Publishes `folder.sync.progress` / `folder.synced`.
+- **M7-03 ✅** TUI: 22-col left sidebar renders `orderedFolders()` (INBOX first, then Important/Starred/Drafts/Sent/All/Spam/Trash specialUse, then user labels alphabetical). Unread count appears in blue. Tab toggles focus — sidebar uses j/k nav, Enter switches. `activeFolder` signal drives the messages resource (auto-refetch on change). Switch clears pending overlay + selection + reader. `folder.sync.progress` filtered to the active folder. `mail.received` only flashes/refetches when its `folder` matches active; still refreshes folder list for unread counts.
+- **Deferred** Per-folder IDLE workers (needs folder-manager module + Gmail conn lifecycle + reconnect-on-close from M12).
+- **Deferred** Label pills in each row (cosmetic; data is already in `messages.labels`).
+- **Deferred** `l <label>` move-to-label mutation (needs label picker + imapflow `X-GM-LABELS` via `client.exec`).
 
 ## M8 — Compose + SMTP
 
