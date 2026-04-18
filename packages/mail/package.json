@@ -15,13 +15,15 @@
     "drizzle-orm": "catalog:",
     "html-to-text": "^9.0.5",
     "imapflow": "catalog:",
-    "mailparser": "^3.9.8"
+    "mailparser": "^3.9.8",
+    "nodemailer": "^8.0.5"
   },
   "devDependencies": {
     "@grace/config": "workspace:*",
     "@types/bun": "catalog:",
     "@types/html-to-text": "^9.0.4",
     "@types/mailparser": "^3.4.6",
+    "@types/nodemailer": "^6.4.18",
     "typescript": "catalog:"
   }
 }

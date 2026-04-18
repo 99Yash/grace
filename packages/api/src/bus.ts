@@ -3,6 +3,7 @@ export type BusEvent =
   | { type: "mail.updated"; gmMsgid: string }
   | { type: "folder.synced"; folder: string; count: number }
   | { type: "folder.sync.progress"; folder: string; done: number; target: number }
+  | { type: "mail.sent"; to: string[]; subject: string; messageId: string }
   | { type: "heartbeat"; at: number };
 
 type Listener = (e: BusEvent) => void;

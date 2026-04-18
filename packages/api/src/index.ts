@@ -9,6 +9,7 @@ import { messageRoutes } from "./routes/messages.ts";
 import { mutateRoutes } from "./routes/mutate.ts";
 import { importRoutes } from "./routes/import.ts";
 import { searchRoutes } from "./routes/search.ts";
+import { sendRoutes } from "./routes/send.ts";
 
 export { bus, type BusEvent } from "./bus.ts";
 export { getCapabilities, type Capabilities } from "./capabilities.ts";
@@ -25,6 +26,7 @@ export const app = new Elysia({ prefix: "/api" })
   .use(mutateRoutes)
   .use(importRoutes)
   .use(searchRoutes)
+  .use(sendRoutes)
   .use(eventRoutes);
 
 export type App = typeof app;

@@ -24,6 +24,12 @@ export {
 } from "./mutations.ts";
 export { listFolders, type FolderEntry } from "./list-folders.ts";
 export {
+  sendMessage,
+  parseRecipients,
+  type SendMessageOpts,
+  type SendMessageResult,
+} from "./send.ts";
+export {
   fetchMessageBody,
   deriveTextFromHtml,
   isTextUseful,

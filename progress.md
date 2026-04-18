@@ -4,7 +4,15 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 ## Timeline
 
-### 2026-04-18 (latest) — M7 folder sidebar + lazy bootstrap
+### 2026-04-18 (latest) — M8 compose + SMTP send (first pass)
+
+- **SMTP via XOAUTH2.** `packages/mail/send.ts` uses nodemailer with `type: "OAuth2"` against `smtps://smtp.gmail.com:465`, reusing the same access token `@grace/auth` mints for IMAP. Transport is opened per-send and `close()`'d in a finally (Gmail 15-conn cap already bites us on IMAP; keeping SMTP short-lived).
+- **`POST /api/send`** validates the recipient list (comma-split + simple email regex — rejects the whole request if any invalid), subject, body. Calls `sendMessage`, returns `{ messageId, accepted, rejected }`, publishes `mail.sent` on the bus. Errors return 502 with the underlying message (nodemailer surfaces `Invalid login`, `Missing credentials`, etc.).
+- **Compose overlay.** `c` from the list view opens a full-screen compose pane (sidebar stays visible). To / Subject / Body. Manual keystroke handling mirroring the search overlay — dodges the opentui `<input>` focus race. Tab / Shift+Tab cycle fields; Return in Body inserts `\n`, Return in To/Subject advances; Ctrl+S or Ctrl+Enter sends; Esc closes (discards — draft persistence is deferred). Status line shows transient state; top bar toast confirms accepted recipients on success.
+- **Deferred to follow-ups.** Draft SQLite persistence + resume-on-reopen; reply/forward pre-fill with `In-Reply-To`/`References`; Cc/Bcc; attachments; HTML bodies; send-progress over SSE.
+- **Deps.** Added `nodemailer` + `@types/nodemailer` to `@grace/mail`. Already present transitively from elysia — no fresh resolution churn.
+
+### 2026-04-18 — M7 folder sidebar + lazy bootstrap
 
 - **M7.** Left sidebar (22 cols) renders the live Gmail folder list from `/api/folders` (which now calls `client.list({ statusQuery: { messages, unseen } })` and merges with SQLite tracked-state; 60s cache with `?refresh=1` bust). Folders sorted INBOX → special-use → user labels. Unread counts in blue. Tab toggles focus between sidebar and list; j/k navigates folders; Enter activates.
 - **Lazy bootstrap.** `POST /api/folders/:name/activate` coalesces concurrent calls via a per-folder promise cache. First activate: spawns a fresh IMAP connection, `bootstrapFolder` pulls 500 headers, then fires `runBackfill` to 1000 in the background (guarded against double-fire by a module-scope `Set`). Publishes `folder.sync.progress` + `folder.synced` on the existing bus.
@@ -82,10 +90,10 @@ grace/
 │   ├── server/  — Elysia daemon, starts IDLE on boot, hosts /api/*
 │   └── tui/     — opentui+Solid client, fetch-SSE, Eden-typed calls
 ├── packages/
-│   ├── api/     — Elysia routes (auth, folders, activate, messages, body, mutate, capabilities, search, import, events) + bus + imap-action singleton
+│   ├── api/     — Elysia routes (auth, folders, activate, messages, body, mutate, capabilities, search, import, events, send) + bus + imap-action singleton
 │   ├── auth/    — OAuth2 flow + keychain + refresh helper
 │   ├── db/      — Drizzle schema (folders, messages, bodies) + bun:sqlite client
-│   ├── mail/    — IMAP client + bootstrap + IDLE + backfill + fetch-body + mutations + list-folders + shared persist helper
+│   ├── mail/    — IMAP client + bootstrap + IDLE + backfill + fetch-body + mutations + list-folders + SMTP send + shared persist helper
 │   ├── env/     — zod-validated env
 │   └── config/  — shared tsconfig base
 └── docs: prd.md · plan.md · progress.md · research.md · README.md
@@ -106,4 +114,4 @@ Smoke tests:
 
 ## Next
 
-M8 — compose + SMTP send. Keep M7 follow-ups (per-folder IDLE, label pills, `l` move) parked until M12 lands connection lifecycle / reconnect.
+M9 — triage mode (one-at-a-time fullscreen, space-through inbox) and/or M10 — command palette. M8 follow-ups (draft persistence, reply pre-fill) can fold in before M9 if needed.

@@ -86,6 +86,19 @@ async function mutateMessage(gmMsgid: string, action: MutateAction): Promise<{ r
   return { removed: Boolean((r.data as { removed?: boolean })?.removed) };
 }
 
+interface SendResult {
+  ok: true;
+  messageId: string;
+  accepted: string[];
+  rejected: string[];
+}
+
+async function sendDraft(draft: { to: string; subject: string; text: string }): Promise<SendResult> {
+  const r = await client.api.send.post(draft);
+  if (r.error) throw r.error;
+  return r.data as SendResult;
+}
+
 async function importHit(hit: SearchHit): Promise<void> {
   const r = await client.api.messages.import.post({
     gmMsgid: hit.gmMsgid,
@@ -457,6 +470,72 @@ function FolderRow(props: { folder: Folder; selected: boolean; focused: boolean 
   );
 }
 
+type ComposeField = "to" | "subject" | "body";
+
+function ComposeOverlay(props: {
+  to: string;
+  subject: string;
+  body: string;
+  field: ComposeField;
+  sending: boolean;
+  statusLine: string;
+}) {
+  const fieldRow = (label: string, value: string, focused: boolean, multiline = false) => {
+    const lines = multiline ? (value === "" ? [""] : value.split("\n")) : [value];
+    return (
+      <box
+        flexDirection="row"
+        flexShrink={multiline ? 1 : 0}
+        paddingLeft={1}
+        paddingRight={1}
+        backgroundColor={focused ? "#1f2937" : "transparent"}
+      >
+        <text fg={focused ? "#ffffff" : "#6b7280"} width={9} flexShrink={0}>
+          {label}
+        </text>
+        <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={multiline ? 0 : 1}>
+          <For each={lines}>
+            {(line, i) => (
+              <box height={1} flexShrink={0} overflow="hidden" flexDirection="row">
+                <text fg="#e5e7eb" flexGrow={1} flexShrink={1}>
+                  {line || " "}
+                </text>
+                <Show when={focused && i() === lines.length - 1}>
+                  <text fg="#4da3ff" flexShrink={0}>▌</text>
+                </Show>
+              </box>
+            )}
+          </For>
+        </box>
+      </box>
+    );
+  };
+
+  return (
+    <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0}>
+      <box
+        flexDirection="row"
+        height={1}
+        flexShrink={0}
+        paddingLeft={1}
+        paddingRight={1}
+        backgroundColor="#1e293b"
+      >
+        <text attributes={1} fg="#ffffff" flexGrow={1}>
+          compose
+        </text>
+        <text fg="#9ca3af">{props.statusLine}</text>
+      </box>
+      {fieldRow("To:", props.to, props.field === "to")}
+      {fieldRow("Subject:", props.subject, props.field === "subject")}
+      <box height={1} flexShrink={0} backgroundColor="#1f2937" />
+      <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0}>
+        {fieldRow("", props.body, props.field === "body", true)}
+      </scrollbox>
+    </box>
+  );
+}
+
 function App() {
   const [auth] = createResource(fetchAuth);
   const [caps] = createResource(fetchCapabilities);
@@ -499,6 +578,68 @@ function App() {
       read: patch.read ?? msg.read,
       starred: patch.starred ?? msg.starred,
     };
+  }
+
+  const [composeOpen, setComposeOpen] = createSignal(false);
+  const [composeField, setComposeField] = createSignal<ComposeField>("to");
+  const [composeTo, setComposeTo] = createSignal("");
+  const [composeSubject, setComposeSubject] = createSignal("");
+  const [composeBody, setComposeBody] = createSignal("");
+  const [composeSending, setComposeSending] = createSignal(false);
+  const [composeStatus, setComposeStatus] = createSignal("tab field · ctrl+s send · esc close");
+
+  function openCompose() {
+    setComposeTo("");
+    setComposeSubject("");
+    setComposeBody("");
+    setComposeField("to");
+    setComposeStatus("tab field · ctrl+s send · esc close");
+    setComposeOpen(true);
+  }
+
+  function closeCompose() {
+    setComposeOpen(false);
+    setComposeSending(false);
+  }
+
+  function composeGetter(f: ComposeField): string {
+    if (f === "to") return composeTo();
+    if (f === "subject") return composeSubject();
+    return composeBody();
+  }
+  function composeSetter(f: ComposeField, updater: (s: string) => string) {
+    if (f === "to") setComposeTo(updater(composeTo()));
+    else if (f === "subject") setComposeSubject(updater(composeSubject()));
+    else setComposeBody(updater(composeBody()));
+  }
+
+  function nextField(cur: ComposeField, reverse = false): ComposeField {
+    const order: ComposeField[] = ["to", "subject", "body"];
+    const i = order.indexOf(cur);
+    const next = reverse ? (i + order.length - 1) % order.length : (i + 1) % order.length;
+    return order[next]!;
+  }
+
+  async function doSend() {
+    if (composeSending()) return;
+    const to = composeTo().trim();
+    const subject = composeSubject().trim();
+    const text = composeBody();
+    if (!to) { setComposeStatus("error: recipient required"); setComposeField("to"); return; }
+    if (!subject) { setComposeStatus("error: subject required"); setComposeField("subject"); return; }
+    if (!text.trim()) { setComposeStatus("error: body required"); setComposeField("body"); return; }
+
+    setComposeSending(true);
+    setComposeStatus("sending…");
+    try {
+      const res = await sendDraft({ to, subject, text });
+      flashToast(`sent to ${res.accepted.join(", ")}`);
+      closeCompose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setComposeStatus(`send failed: ${msg}`);
+      setComposeSending(false);
+    }
   }
 
   const [searchOpen, setSearchOpen] = createSignal(false);
@@ -773,6 +914,36 @@ function App() {
     const list = visibleMessages();
     const total = list.length;
 
+    if (composeOpen()) {
+      if (composeSending()) {
+        if (e.name === "escape") { closeCompose(); return; }
+        return;
+      }
+      if (e.name === "escape") { closeCompose(); return; }
+      if (e.ctrl && (e.name === "s" || e.name === "return")) { void doSend(); return; }
+      if (e.name === "tab" && !e.shift) { setComposeField((f) => nextField(f)); return; }
+      if (e.name === "tab" && e.shift) { setComposeField((f) => nextField(f, true)); return; }
+
+      const f = composeField();
+      if (e.name === "backspace") {
+        if (e.meta) composeSetter(f, () => "");
+        else composeSetter(f, (s) => s.slice(0, -1));
+        return;
+      }
+      if (e.name === "space") { composeSetter(f, (s) => s + " "); return; }
+      if (e.name === "return") {
+        if (f === "body") composeSetter(f, (s) => s + "\n");
+        else setComposeField((cur) => nextField(cur));
+        return;
+      }
+      const seq = (e as { sequence?: string }).sequence;
+      if (seq && seq.length === 1 && !e.ctrl && !e.meta) {
+        const code = seq.charCodeAt(0);
+        if (code >= 0x20 && code !== 0x7f) composeSetter(f, (s) => s + seq);
+      }
+      return;
+    }
+
     if (e.name === "tab" && !searchOpen() && !readerOpen()) {
       setSidebarFocused((f) => !f);
       return;
@@ -889,6 +1060,10 @@ function App() {
 
     if (e.name === "/" && !e.ctrl && !e.meta && !searchOpen()) {
       setSearchOpen(true);
+      return;
+    }
+    if (e.name === "c" && !e.ctrl && !e.meta && !e.shift) {
+      openCompose();
       return;
     }
     if (e.name === "r" && !e.ctrl && !e.meta) {
@@ -1028,6 +1203,21 @@ function App() {
             </scrollbox>
           </box>
           <box width={1} flexShrink={0} backgroundColor="#1f2937" />
+          <Show
+            when={!composeOpen()}
+            fallback={
+              <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
+                <ComposeOverlay
+                  to={composeTo()}
+                  subject={composeSubject()}
+                  body={composeBody()}
+                  field={composeField()}
+                  sending={composeSending()}
+                  statusLine={composeStatus()}
+                />
+              </box>
+            }
+          >
           <box
             flexDirection="column"
             flexGrow={readerOpen() ? 0 : 1}
@@ -1062,6 +1252,7 @@ function App() {
               renderMode={renderMode()}
             />
           </Show>
+          </Show>
         </box>
       </Show>
 
@@ -1075,7 +1266,10 @@ function App() {
         backgroundColor="#0b1220"
       >
         <text fg="#4b5563" flexGrow={1}>
-          <Switch fallback="tab folders · j/k nav · enter open · m read · s star · e archive · # trash · / search">
+          <Switch fallback="tab folders · j/k nav · enter open · c compose · m read · s star · e archive · # trash · / search">
+            <Match when={composeOpen()}>
+              tab field · ctrl+s send · esc close
+            </Match>
             <Match when={sidebarFocused()}>
               j/k nav · enter switch · tab/esc back to list
             </Match>

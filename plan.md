@@ -15,7 +15,7 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M5c | Two-phase search (local + remote) | ✅ done | SQLite LIKE + Gmail `X-GM-RAW` stream-merge, `/` overlay (manual keystroke handling, no dropped first char), opportunistic import on remote-only open |
 | M6 | Mutations (archive / read / star / trash) | 🟡 partial | optimistic UI + IMAP via `applyMutation`; label-move deferred to M7 |
 | M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; per-folder IDLE + label pills deferred |
-| M8 | Compose + SMTP send | ⬜ | draft queue, nodemailer, optimistic send |
+| M8 | Compose + SMTP send | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill deferred |
 | M9 | Triage mode | ⬜ | fullscreen one-at-a-time, space-bar through inbox |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
 | M11 | Claude features | ⬜ | summarize, draft, NL-select (`. "urgent from stripe"`) |
@@ -77,12 +77,16 @@ Landed: live Gmail folder list drives a left sidebar. Tab toggles sidebar ↔ li
 - **Deferred** Label pills in each row (cosmetic; data is already in `messages.labels`).
 - **Deferred** `l <label>` move-to-label mutation (needs label picker + imapflow `X-GM-LABELS` via `client.exec`).
 
-## M8 — Compose + SMTP
+## M8 — Compose + SMTP (partial)
 
-- Compose modal overlay (Input × 3 + Textarea).
-- Draft auto-save to SQLite every N keystrokes.
-- Send: queue mutation → daemon → nodemailer over Gmail SMTP (same OAuth token).
-- Optimistic "Sent ✓" in UI immediately.
+Landed: `c` opens a full-screen compose overlay (sidebar stays visible). Fields: To (comma-separated), Subject, Body. `Tab` cycles fields; `Ctrl+S` or `Ctrl+Enter` sends; `Esc` closes (discards). Send hits `POST /api/send` which refreshes the OAuth token and hands off to nodemailer over `smtps://smtp.gmail.com:465` with XOAUTH2. Success publishes `mail.sent` on the bus and toasts accepted recipients.
+
+- **M8-01 ✅** `packages/mail/send.ts` — `sendMessage({email, accessToken, to, subject, text})` creates a nodemailer SMTP transport with XOAUTH2 auth, sends, and tears down. Also exports `parseRecipients(raw)` for comma-split + regex validation returning `{valid, invalid}`.
+- **M8-02 ✅** `POST /api/send` — validates body, refreshes access token via `@grace/auth`, calls `sendMessage`, publishes `mail.sent`. 400 on empty/invalid fields; 502 on SMTP failure (message included in error).
+- **M8-03 ✅** TUI compose overlay — manual keystroke handling per field (same pattern as search overlay, avoids opentui `<input>` focus-race). `ComposeOverlay` component renders focused field with inline cursor `▌`; Body is a scrollbox so long mail fits. Status line shows transient state ("sending…", error, or the keybind hint). Bottom help bar flips to the compose hint.
+- **Deferred** Draft persistence to SQLite (auto-save every N keystrokes + resumable drafts).
+- **Deferred** Reply/forward pre-fill from reader (`R` in reader → compose pre-filled with `In-Reply-To`/`References` + quoted body).
+- **Deferred** Cc/Bcc fields; attachments; HTML bodies; sending progress via SSE rather than awaited POST.
 
 ## M9 — Triage mode
 
