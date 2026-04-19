@@ -35,6 +35,7 @@ const LABELS: Record<string, string> = {
   "mail.trash": "Trash",
   "reader.w3m": "Render rich (w3m)",
   "reader.browser": "Open in browser",
+  "reader.reply": "Reply",
   "reader.textMode": "Plain text mode",
   "reader.toggleQuotes": "Toggle quoted text",
   "sidebar.toggle": "Focus sidebar",

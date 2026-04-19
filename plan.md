@@ -14,8 +14,8 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M5b | Partial sync + progressive backfill | ✅ done | 1000-msg backfill worker, sync progress pill, `persist.ts` extraction, `/api/capabilities` |
 | M5c | Two-phase search (local + remote) | ✅ done | SQLite LIKE + Gmail `X-GM-RAW` stream-merge, `/` overlay (manual keystroke handling, no dropped first char), opportunistic import on remote-only open |
 | M6 | Mutations (archive / read / star / trash) | 🟡 partial | optimistic UI + IMAP via `applyMutation`; label-move deferred to M7 |
-| M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; per-folder IDLE + label pills deferred |
-| M8 | Compose + SMTP send | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill deferred |
+| M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; label pills in row; per-folder IDLE + `l` label-move deferred |
+| M8 | Compose + SMTP send | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill with threading; Cc/Bcc + attachments deferred |
 | M9 | Triage mode | ⬜ | fullscreen one-at-a-time, space-bar through inbox |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
 | M11 | Claude features | ⬜ | summarize, draft, NL-select (`. "urgent from stripe"`) |
@@ -73,8 +73,8 @@ Landed: live Gmail folder list drives a left sidebar. Tab toggles sidebar ↔ li
 - **M7-01 ✅** `GET /api/folders` does `client.list({ statusQuery: { messages, unseen } })` via the action-client, merges with SQLite tracked-state, caches for 60s (`?refresh=1` to bust). Falls back to SQLite-only rows if IMAP fails.
 - **M7-02 ✅** `POST /api/folders/:name/activate` — per-folder promise cache to coalesce concurrent requests. If local count is 0, runs `bootstrapFolder` on a fresh client. Kicks off `runBackfill` in background once per folder for the server's lifetime. Publishes `folder.sync.progress` / `folder.synced`.
 - **M7-03 ✅** TUI: 22-col left sidebar renders `orderedFolders()` (INBOX first, then Important/Starred/Drafts/Sent/All/Spam/Trash specialUse, then user labels alphabetical). Unread count appears in blue. Tab toggles focus — sidebar uses j/k nav, Enter switches. `activeFolder` signal drives the messages resource (auto-refetch on change). Switch clears pending overlay + selection + reader. `folder.sync.progress` filtered to the active folder. `mail.received` only flashes/refetches when its `folder` matches active; still refreshes folder list for unread counts.
+- **M7-04 ✅** Label pills in each row — `visibleLabels(labels, activeFolder, 2)` helper in `format.ts` filters out redundant Gmail system labels (`\Inbox` / `\Starred` / `\Unread` / `\Sent` / `\Draft(s)` / `\Trash` / `\Spam` / `\Junk` / `\Chat` / `\Muted`) plus the currently active folder (so viewing `Work` doesn't double-surface the `Work` pill). Remaining labels render as `[name]` chips before the subject (truncated to 14 chars each), capped at 2 with `+N` overflow. Hidden in compact (reader-open) mode so the 48-col list still fits.
 - **Deferred** Per-folder IDLE workers (needs folder-manager module + Gmail conn lifecycle + reconnect-on-close from M12).
-- **Deferred** Label pills in each row (cosmetic; data is already in `messages.labels`).
 - **Deferred** `l <label>` move-to-label mutation (needs label picker + imapflow `X-GM-LABELS` via `client.exec`).
 
 ## M8 — Compose + SMTP (partial)
@@ -84,8 +84,8 @@ Landed: `c` opens a full-screen compose overlay (sidebar stays visible). Fields:
 - **M8-01 ✅** `packages/mail/send.ts` — `sendMessage({email, accessToken, to, subject, text})` creates a nodemailer SMTP transport with XOAUTH2 auth, sends, and tears down. Also exports `parseRecipients(raw)` for comma-split + regex validation returning `{valid, invalid}`.
 - **M8-02 ✅** `POST /api/send` — validates body, refreshes access token via `@grace/auth`, calls `sendMessage`, publishes `mail.sent`. 400 on empty/invalid fields; 502 on SMTP failure (message included in error).
 - **M8-03 ✅** TUI compose overlay — manual keystroke handling per field (same pattern as search overlay, avoids opentui `<input>` focus-race). `ComposeOverlay` component renders focused field with inline cursor `▌`; Body is a scrollbox so long mail fits. Status line shows transient state ("sending…", error, or the keybind hint). Bottom help bar flips to the compose hint.
-- **Deferred** Draft persistence to SQLite (auto-save every N keystrokes + resumable drafts).
-- **Deferred** Reply/forward pre-fill from reader (`R` in reader → compose pre-filled with `In-Reply-To`/`References` + quoted body).
+- **M8-04 ✅** Reply pre-fill — `shift+r` from the reader opens compose pre-filled with `To` = original sender, `Subject` = `Re: …` (dedup-safe), and a quoted body (`On <date>, <who> wrote:` + `> `-prefixed lines). Body route re-reads the cached `.eml` header block (first 32 KB) to extract `Message-ID` / `In-Reply-To` / `References`; fresh fetches get them from mailparser. Threading headers ride through `POST /api/send` into nodemailer's `inReplyTo` / `references` so Gmail stitches the reply into the original thread.
+- **Deferred** Reply context survives compose close — closing mid-reply keeps the text in the draft file but drops the threading headers (next open becomes a plain compose). Acceptable for first pass; fix when draft records carry reply metadata.
 - **Deferred** Cc/Bcc fields; attachments; HTML bodies; sending progress via SSE rather than awaited POST.
 
 ## M9 — Triage mode

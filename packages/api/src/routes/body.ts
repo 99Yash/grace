@@ -1,9 +1,14 @@
-import { readFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync, readSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { bodies, folders, messages } from "@grace/db";
 import { env } from "@grace/env/server";
-import { deriveTextFromHtml, fetchMessageBody, isTextUseful } from "@grace/mail";
+import {
+  deriveTextFromHtml,
+  extractReplyHeaders,
+  fetchMessageBody,
+  isTextUseful,
+} from "@grace/mail";
 import { bus } from "../bus.ts";
 import { db } from "../db.ts";
 import { withActionClient } from "../imap-action.ts";
@@ -48,6 +53,10 @@ export const bodyRoutes = new Elysia().get(
           db().update(bodies).set({ text }).where(eq(bodies.gmMsgid, gmMsgid)).run();
         }
       }
+      const rawHeader = cached.rawPath ? safeReadHead(cached.rawPath, 32 * 1024) : null;
+      const headers = rawHeader
+        ? extractReplyHeaders(rawHeader)
+        : { messageId: null, inReplyTo: null, references: [] };
       return {
         gmMsgid,
         text,
@@ -57,6 +66,9 @@ export const bodyRoutes = new Elysia().get(
         attachments: [] as AttachmentOut[],
         sizeBytes: cached.sizeBytes,
         cached: true,
+        messageId: headers.messageId,
+        inReplyTo: headers.inReplyTo,
+        references: headers.references,
       };
     }
 
@@ -93,6 +105,9 @@ export const bodyRoutes = new Elysia().get(
       attachments: fetched.attachments,
       sizeBytes: fetched.sizeBytes,
       cached: false,
+      messageId: fetched.messageId,
+      inReplyTo: fetched.inReplyTo,
+      references: fetched.references,
     };
   },
   {
@@ -113,5 +128,21 @@ function safeReadUtf8(path: string): string | null {
     return readFileSync(path, "utf8");
   } catch {
     return null;
+  }
+}
+
+function safeReadHead(path: string, bytes: number): string | null {
+  let fd: number | null = null;
+  try {
+    fd = openSync(path, "r");
+    const buf = Buffer.allocUnsafe(bytes);
+    const n = readSync(fd, buf, 0, bytes, 0);
+    return buf.subarray(0, n).toString("utf8");
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) {
+      try { closeSync(fd); } catch {}
+    }
   }
 }

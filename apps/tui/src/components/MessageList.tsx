@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { DEBUG, type Message } from "../api.ts";
-import { formatRelative, truncate } from "../format.ts";
+import { formatRelative, truncate, visibleLabels } from "../format.ts";
 import { useAppState } from "../state/app-state.tsx";
 import { useTheme } from "../theme/index.tsx";
 
@@ -16,10 +16,18 @@ export const [debugView, setDebugView] = createSignal(0);
 export const [debugSh, setDebugSh] = createSignal(0);
 export const [debugRef, setDebugRef] = createSignal(false);
 
-function MessageRow(props: { msg: Message; selected: boolean; compact: boolean }) {
+function MessageRow(props: {
+  msg: Message;
+  selected: boolean;
+  compact: boolean;
+  activeFolder: string;
+}) {
   const t = useTheme();
   const subjectFg = () => (props.selected ? t.text : props.msg.read ? t.textRead : t.textBright);
   const metaFg = () => (props.selected ? t.primaryOnSelection : t.textSubtle);
+  const labelFg = () => (props.selected ? t.primaryOnSelection : t.primarySoft);
+  const pills = () =>
+    props.compact ? { shown: [], extra: 0 } : visibleLabels(props.msg.labels, props.activeFolder, 2);
   return (
     <box
       flexDirection="row"
@@ -36,6 +44,18 @@ function MessageRow(props: { msg: Message; selected: boolean; compact: boolean }
       <text fg={t.star} width={COL.star} flexShrink={0}>
         {props.msg.starred ? "★" : " "}
       </text>
+      <For each={pills().shown}>
+        {(label) => (
+          <text fg={labelFg()} flexShrink={0}>
+            {`[${truncate(label, 14)}] `}
+          </text>
+        )}
+      </For>
+      <Show when={pills().extra > 0}>
+        <text fg={labelFg()} flexShrink={0}>
+          {`+${pills().extra} `}
+        </text>
+      </Show>
       <text fg={subjectFg()} flexGrow={1} flexShrink={1}>
         {truncate(props.msg.subject ?? "(no subject)", props.compact ? 38 : 80)}
       </text>
@@ -97,7 +117,14 @@ export function InboxList() {
       minHeight={0}
     >
       <For each={s.visibleMessages()}>
-        {(msg, i) => <MessageRow msg={msg} selected={s.selected() === i()} compact={s.readerOpen()} />}
+        {(msg, i) => (
+          <MessageRow
+            msg={msg}
+            selected={s.selected() === i()}
+            compact={s.readerOpen()}
+            activeFolder={s.activeFolder()}
+          />
+        )}
       </For>
     </scrollbox>
   );

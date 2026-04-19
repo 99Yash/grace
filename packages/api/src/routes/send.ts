@@ -37,6 +37,10 @@ export const sendRoutes = new Elysia().post(
         to: valid,
         subject,
         text: body.text,
+        ...(body.inReplyTo ? { inReplyTo: body.inReplyTo } : {}),
+        ...(body.references && body.references.length > 0
+          ? { references: body.references }
+          : {}),
       });
       bus.publish({
         type: "mail.sent",
@@ -61,6 +65,8 @@ export const sendRoutes = new Elysia().post(
       to: t.String(),
       subject: t.String(),
       text: t.String(),
+      inReplyTo: t.Optional(t.String()),
+      references: t.Optional(t.Array(t.String())),
     }),
   },
 );

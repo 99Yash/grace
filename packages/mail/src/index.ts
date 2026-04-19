@@ -32,6 +32,7 @@ export {
 export {
   fetchMessageBody,
   deriveTextFromHtml,
+  extractReplyHeaders,
   isTextUseful,
   type FetchBodyOpts,
   type FetchBodyResult,

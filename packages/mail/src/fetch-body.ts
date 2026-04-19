@@ -52,12 +52,61 @@ export interface FetchBodyResult {
   rawPath: string;
   attachments: AttachmentMeta[];
   sizeBytes: number;
+  messageId: string | null;
+  inReplyTo: string | null;
+  references: string[];
 }
 
 export interface AttachmentMeta {
   filename: string | null;
   contentType: string;
   size: number;
+}
+
+/**
+ * Pull Message-ID / In-Reply-To / References from a raw RFC-822 source.
+ * Scans only the header block so large HTML bodies don't cost anything.
+ * simpleParser has this data too but re-parsing on every cache hit is
+ * overkill when we only want 3 headers.
+ */
+export function extractReplyHeaders(raw: string | Buffer): {
+  messageId: string | null;
+  inReplyTo: string | null;
+  references: string[];
+} {
+  const text = typeof raw === "string" ? raw : raw.toString("utf8");
+  const headerEnd = text.search(/\r?\n\r?\n/);
+  const block = headerEnd >= 0 ? text.slice(0, headerEnd) : text;
+  const unfolded = block.replace(/\r?\n[ \t]+/g, " ");
+  const lines = unfolded.split(/\r?\n/);
+  let messageId: string | null = null;
+  let inReplyTo: string | null = null;
+  let referencesRaw = "";
+  for (const line of lines) {
+    const m = line.match(/^([A-Za-z-]+):\s*(.*)$/);
+    if (!m) continue;
+    const name = m[1]!.toLowerCase();
+    const value = m[2]!.trim();
+    if (name === "message-id" && !messageId) messageId = firstBracketed(value);
+    else if (name === "in-reply-to" && !inReplyTo) inReplyTo = firstBracketed(value);
+    else if (name === "references" && !referencesRaw) referencesRaw = value;
+  }
+  const references = parseAllBracketed(referencesRaw);
+  return { messageId, inReplyTo, references };
+}
+
+function firstBracketed(value: string): string | null {
+  const m = value.match(/<([^>]+)>/);
+  return m ? m[1]! : value.length > 0 ? value : null;
+}
+
+function parseAllBracketed(value: string): string[] {
+  if (!value) return [];
+  const out: string[] = [];
+  const re = /<([^>]+)>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) out.push(m[1]!);
+  return out;
 }
 
 export async function fetchMessageBody(opts: FetchBodyOpts): Promise<FetchBodyResult> {
@@ -98,6 +147,10 @@ export async function fetchMessageBody(opts: FetchBodyOpts): Promise<FetchBodyRe
     size: a.size ?? 0,
   }));
 
+  const messageId = typeof parsed.messageId === "string" ? stripBrackets(parsed.messageId) : null;
+  const inReplyTo = typeof parsed.inReplyTo === "string" ? stripBrackets(parsed.inReplyTo) : null;
+  const references = normalizeReferences(parsed.references);
+
   return {
     gmMsgid,
     text,
@@ -106,5 +159,19 @@ export async function fetchMessageBody(opts: FetchBodyOpts): Promise<FetchBodyRe
     rawPath,
     attachments,
     sizeBytes: source.byteLength,
+    messageId,
+    inReplyTo,
+    references,
   };
+}
+
+function stripBrackets(id: string): string {
+  const m = id.match(/<([^>]+)>/);
+  return m ? m[1]! : id;
+}
+
+function normalizeReferences(refs: string | string[] | undefined): string[] {
+  if (!refs) return [];
+  const arr = Array.isArray(refs) ? refs : [refs];
+  return arr.map(stripBrackets).filter(Boolean);
 }

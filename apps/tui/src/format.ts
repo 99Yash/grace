@@ -63,3 +63,73 @@ export function extractUrls(text: string): string[] {
   }
   return out;
 }
+
+const RE_PREFIX = /^\s*(re|aw|sv|r)\s*:\s*/i;
+
+export function buildReplySubject(original: string | null): string {
+  const trimmed = (original ?? "").trim();
+  if (!trimmed) return "Re: ";
+  return RE_PREFIX.test(trimmed) ? trimmed : `Re: ${trimmed}`;
+}
+
+type QuoteSource = {
+  fromName: string | null;
+  fromEmail: string | null;
+  date: number;
+};
+
+export function buildQuotedBody(msg: QuoteSource, originalText: string): string {
+  const who = msg.fromName ?? msg.fromEmail ?? "someone";
+  const when = new Date(msg.date).toLocaleString();
+  const quoted = originalText
+    .split("\n")
+    .map((line) => (line.length ? `> ${line}` : ">"))
+    .join("\n");
+  return `\n\nOn ${when}, ${who} wrote:\n${quoted}`;
+}
+
+export function buildReferences(existing: string[], messageId: string | null): string[] {
+  const out = [...existing];
+  if (messageId && !out.includes(messageId)) out.push(messageId);
+  return out;
+}
+
+const GMAIL_REDUNDANT_LABELS = new Set([
+  "\\Inbox",
+  "\\Starred",
+  "\\Unread",
+  "\\Sent",
+  "\\Draft",
+  "\\Drafts",
+  "\\Trash",
+  "\\Spam",
+  "\\Junk",
+  "\\Chat",
+  "\\Muted",
+]);
+
+export function displayLabelName(raw: string): string {
+  // Strip leading backslash on system labels we chose to surface (e.g. "\Important" → "Important").
+  return raw.startsWith("\\") ? raw.slice(1) : raw;
+}
+
+export function visibleLabels(
+  labels: string[] | null | undefined,
+  activeFolder: string,
+  max = 2,
+): { shown: string[]; extra: number } {
+  if (!labels || labels.length === 0) return { shown: [], extra: 0 };
+  const seen = new Set<string>();
+  const filtered: string[] = [];
+  for (const raw of labels) {
+    if (!raw) continue;
+    if (GMAIL_REDUNDANT_LABELS.has(raw)) continue;
+    if (raw === activeFolder) continue;
+    const name = displayLabelName(raw);
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    filtered.push(name);
+  }
+  if (filtered.length <= max) return { shown: filtered, extra: 0 };
+  return { shown: filtered.slice(0, max), extra: filtered.length - max };
+}

@@ -4,7 +4,21 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 ## Timeline
 
-### 2026-04-18 (latest) — M8 compose + SMTP send (first pass)
+### 2026-04-19 (later) — M7 label pills in message rows
+
+- **Why.** Labels are the highest-signal piece of metadata Gmail gives us after read/star, and we were already storing them in `messages.labels` but only rendering them in the reader header. Inbox scan-time is where they actually help — "which of these is from work" — so they belong in the list row.
+- **`visibleLabels(labels, activeFolder, max=2)`** in `format.ts` — filters out the Gmail system labels that are already expressed elsewhere in the UI (`\Inbox` by folder, `\Starred` by the star column, `\Unread` by the dot, `\Sent`/`\Draft(s)`/`\Trash`/`\Spam`/`\Junk`/`\Chat`/`\Muted` by folder position), plus any label matching the currently active folder path (so browsing the `Work` folder doesn't add a redundant `[Work]` pill to every row). De-dupes, strips the leading `\` on survivors (e.g. `\Important` → `Important`), caps at 2 with an overflow count.
+- **Row render.** `MessageList.tsx` emits the surviving labels as `[name]` chips between the star column and the subject text, in `t.primarySoft` (or `t.primaryOnSelection` when the row is selected). Each label truncates at 14 chars. Hidden when `compact` (reader open) so the 48-col list pane still fits.
+- **Row stays height=1.** Pills are `flexShrink=0` `<text>` fragments sharing the subject's flex budget — subject truncates first when labels are present, which is the right trade-off (labels *are* meta about the subject).
+
+### 2026-04-19 — M8 reply pre-fill with threading
+
+- **`shift+r` in reader → compose with a real reply.** To/Subject/Body pre-filled: `To` is the original sender's email, `Subject` is `Re: <original>` (skips the prefix if the original already starts with `Re:` / `Aw:` / `Sv:` / `R:` to avoid `Re: Re: Re:` stacking), body is `\n\nOn <locale date>, <name|email> wrote:\n> …` with each source line prefixed `> `. Compose lands on the body field when a recipient is known so the user can just start typing above the quote.
+- **Threading headers.** `packages/mail/fetch-body.ts` now returns `messageId` / `inReplyTo` / `references` from mailparser on fresh fetches. `/api/messages/:gmMsgid/body` additionally extracts them on cache hits via a new bounded `safeReadHead(path, 32KB)` + regex-based `extractReplyHeaders(raw)` — cheaper than re-running `simpleParser` for cached reads where we only need the header block. `POST /api/send` accepts optional `inReplyTo` + `references`; `sendMessage` forwards them to nodemailer (wrapping bare ids in `<>`), which emits correct `In-Reply-To:` / `References:` SMTP headers so Gmail stitches the reply into the original thread.
+- **Reply-aware compose state.** New `replyContext` signal holds `{ inReplyTo, references }` while a reply is being composed. `openReply()` clears any unrelated stored draft, sets context, mounts prefill; `doSend` reads context and passes headers on send; `onClose` clears context. `openCompose()` also clears context so a `c`-initiated fresh compose never silently inherits the last reply's headers.
+- **Known gap.** Closing the compose dialog mid-reply drops `replyContext` but the draft file still contains the reply text — reopening with `c` restores the text as a plain compose (no threading). Documented in plan.md; fix when draft records get metadata.
+
+### 2026-04-18 — M8 compose + SMTP send (first pass)
 
 - **SMTP via XOAUTH2.** `packages/mail/send.ts` uses nodemailer with `type: "OAuth2"` against `smtps://smtp.gmail.com:465`, reusing the same access token `@grace/auth` mints for IMAP. Transport is opened per-send and `close()`'d in a finally (Gmail 15-conn cap already bites us on IMAP; keeping SMTP short-lived).
 - **`POST /api/send`** validates the recipient list (comma-split + simple email regex — rejects the whole request if any invalid), subject, body. Calls `sendMessage`, returns `{ messageId, accepted, rejected }`, publishes `mail.sent` on the bus. Errors return 502 with the underlying message (nodemailer surfaces `Invalid login`, `Missing credentials`, etc.).

@@ -30,7 +30,7 @@ export function HelpBar() {
             type to search · ↑↓ nav · enter open · esc cancel
           </Match>
           <Match when={s.readerOpen()}>
-            {`m read · s star · e archive · # trash${s.caps()?.w3m ? " · v rich" : ""} · V browser · t text · esc close`}
+            {`R reply · m read · s star · e archive · # trash${s.caps()?.w3m ? " · v rich" : ""} · V browser · t text · esc close`}
           </Match>
         </Switch>
       </text>

@@ -25,6 +25,7 @@ export const DEFAULT_KEYBINDS = {
   "mail.trash": "#,shift+3",
   "reader.w3m": "v",
   "reader.browser": "shift+v",
+  "reader.reply": "shift+r",
   "reader.textMode": "t",
   "reader.toggleQuotes": "z",
   "sidebar.toggle": "tab",

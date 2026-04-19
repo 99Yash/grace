@@ -5,7 +5,7 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-PROMPT="${2:-Advance the grace UI refresh. Follow the Ralph protocol in your system prompt.}"
+PROMPT="${2:-Advance the grace milestone punch list. Follow the Ralph protocol in your system prompt.}"
 
 BOLD=$'\033[1m'; CYAN=$'\033[36m'; GREEN=$'\033[32m'; RESET=$'\033[0m'
 
@@ -14,53 +14,102 @@ RALPH LOOP — you are one iteration of a shell loop (`ralph.sh`). Each
 iteration is a fresh Claude Code session with NO memory of prior runs. All
 continuity lives in repo files and git history. Read before you write.
 
-Source of truth: `refresh.md` (the 7-phase plan). Cross-refs: `plan.md`
-(milestones), `progress.md` (shipped), `prd.md` (product intent),
-`uiux.md` (rough-edge catalog).
+Source of truth: `plan.md` (milestone status table + per-milestone
+deferred lists). Cross-refs: `progress.md` (dated log of what shipped),
+`prd.md` (product intent), `refresh.md` (UI primitives plan — R1-R13
+and R15 are done; only R14 remains), `uiux.md` (rough-edge catalog).
+
+Remaining punch list (pick from the lowest unblocked item each run):
+
+  M6.label-move     — `l` mutation: label picker + imapflow `client.exec`
+                      X-GM-LABELS STORE, or moves between label folders.
+  M7.per-folder-idle — folder manager module with connection lifecycle;
+                      do M12.idle-reconnect first so you can reuse the
+                      backoff/reconnect helper. Gmail 15-conn cap is real.
+  M7.label-pills    — cosmetic row decoration; data already in
+                      messages.labels.
+  M8.reply-prefill  — `R` in reader → compose pre-filled with
+                      In-Reply-To / References + quoted body.
+  M8.cc-bcc         — Cc / Bcc fields in compose overlay + send route.
+  M8.attachments    — multipart attachments via nodemailer.
+  M9.triage         — fullscreen one-at-a-time view; space = next+archive,
+                      `a` archive, `r` reply. Inspired by Spark/Superhuman.
+  M11.summarize     — Claude summarize selected thread. NOTE: `s` already
+                      means star; pick a leader chord (e.g. `<leader>s`)
+                      or a different key, and update help + registry.
+                      Needs ANTHROPIC_API_KEY in .env.
+  M11.draft         — Claude draft reply from thread; pre-fills compose.
+  M11.nl-select     — `.` → NL prompt → Claude → X-GM-RAW → bulk action.
+  M12.idle-reconnect — exponential backoff on imapflow `close` event.
+  M12.network-recovery — detect network drop/restore; reconnect cleanly.
+  M12.doctor        — `grace doctor` CLI: env / keychain / db / imap status.
+  M12.oauth-logout  — `grace oauth logout` clears keychain entries.
+  M12.docs          — README + SETUP.md for a fresh install.
+  R14.virtualize    — manual viewport buffer for message list.
+                      Only pick if a real >500-msg backlog stutters.
 
 Protocol — follow every iteration:
 
-  1. Read `refresh.md`, especially Phase 5 (ticket table R1-R15) and
-     Phase 7 (QA checklist). Read `progress.md` for context on what
-     already shipped.
+  1. Read `plan.md` (milestone table + the partial/deferred sections
+     for M6, M7, M8). Read `progress.md` for what already shipped.
   2. Run `git log --oneline -20` to see what prior iterations landed.
      Trust git, not your assumptions.
-  3. Pick ONE unblocked ticket. Prefer the lowest ID with remaining
-     work. Respect the blocking relationships in Phase 5.
-  4. Implement exactly that ticket. Honor its acceptance criteria. No
-     drive-by refactors, no scope creep. If the ticket is bigger than
-     one session, split it in `refresh.md` and do the first half.
+  3. Pick ONE unblocked item from the punch list above. Prefer the
+     topmost remaining item. Respect blocking relationships
+     (e.g. M7.per-folder-idle is blocked on M12.idle-reconnect).
+  4. Implement exactly that item. Honor the acceptance criteria
+     implied by plan.md for its milestone. No drive-by refactors, no
+     scope creep. If the item is bigger than one session, split it in
+     `plan.md` and do the first half.
   5. Run `bun run check-types`. Must pass. Fix failures;
      broken types are not allowed.
-  6. Mark the ticket ✅ in `refresh.md`'s Phase 5 table.
-  7. If ALL tickets R1-R15 in `refresh.md` Phase 5 are ✅ AND the Phase
-     7 smoke checklist passes, emit exactly `<promise>COMPLETE</promise>`
-     as your final output line. Otherwise end naturally — the loop
-     continues.
+  6. Update `plan.md`: flip the milestone row to ✅ when its whole
+     deferred list clears, else trim the relevant "Deferred" bullet
+     and keep the 🟡 partial marker honest. Append a dated bullet to
+     `progress.md` describing what shipped (follow the existing
+     voice — terse, technical, why over what).
+  7. If every milestone in plan.md's status table is ✅ AND the smoke
+     checklist below passes, emit exactly
+     `<promise>COMPLETE</promise>` as your final output line.
+     Otherwise end naturally — the loop continues.
+
+Smoke checklist (non-negotiable — never regress):
+
+  - Inbox loads; folder sidebar populates; IDLE pushes new mail.
+  - `j`/`k` nav; Enter opens reader; Esc closes.
+  - Compose (`c`) opens, sends, closes. Error path surfaces in UI.
+  - Search (`/`) opens, local + remote hits stream; Enter on remote
+     imports + opens.
+  - Mutations `m`, `s`, `e`, `#` round-trip through SSE and clear the
+     pending overlay.
+  - Folder switching from sidebar still lazy-bootstraps + backfills.
+  - `:` palette opens; `?` help opens; theme picker works.
 
 Hard rules:
 
-  - One ticket per iteration. No batching, no "while I'm here."
-  - Never regress a previously ✅ ticket. The Phase 7 smoke checklist
-     is non-negotiable: inbox loads, j/k nav, Enter opens reader,
-     compose sends, search works, mutations round-trip.
-  - `apps/tui/src/index.tsx` should SHRINK every iteration, never grow.
-  - If a ticket needs a human decision (e.g. Phase 3 prototype choices,
-     keybind defaults, palette UX calls), write the question + your
-     recommendation to `refresh-decisions.md`, end
-     the iteration. Do NOT emit COMPLETE.
+  - One item per iteration. No batching, no "while I'm here."
+  - Never regress a previously shipped milestone. Smoke checklist is
+     non-negotiable.
+  - `apps/tui/src/index.tsx` stays lean (it's ~220 lines after the
+     refresh — don't reinflate it). New code lives in components/,
+     ui/, or packages/.
+  - If an item needs a human decision (keybind collision resolution,
+     UX trade-off, Anthropic model pick, etc.), append the question +
+     your recommendation to `refresh-decisions.md` and end the
+     iteration. Do NOT emit COMPLETE.
   - If you truly cannot make progress (blocker, ambiguity, missing
-     dependency), append a dated note to `refresh-blockers.md`
-     explaining why and what's needed, end the iteration.
+     dep, missing ANTHROPIC_API_KEY for M11), append a dated note to
+     `refresh-blockers.md` explaining why and what's needed, end the
+     iteration.
   - Prefer porting patterns from `/Users/yash/Developer/oss/opencode`
-     (opentui+Solid peer app) over inventing. File anchors for each
-     primitive are in `refresh.md` Phase 2.
-  - Do not touch `plan.md`, `prd.md`, or `progress.md` unless a ticket
-     explicitly requires it. `refresh.md` is your scratchpad.
+     (opentui+Solid peer app) over inventing.
+  - Do not touch `prd.md` or `refresh.md` unless the item explicitly
+     requires it. `plan.md` + `progress.md` are where you record
+     progress.
 
 Permissions are pre-approved (`--permission-mode bypassPermissions`).
 Use that trust carefully — destructive ops (git reset --hard, force
-push, rm -rf) are still off-limits unless a ticket explicitly calls
+push, rm -rf) are still off-limits unless an item explicitly calls
 for them.
 EOF
 

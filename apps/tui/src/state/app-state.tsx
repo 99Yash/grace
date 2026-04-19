@@ -37,7 +37,12 @@ import {
 } from "../api.ts";
 import { ComposeOverlay } from "../components/Compose.tsx";
 import { SearchOverlay } from "../components/Search.tsx";
-import { extractUrls } from "../format.ts";
+import {
+  buildQuotedBody,
+  buildReferences,
+  buildReplySubject,
+  extractUrls,
+} from "../format.ts";
 import { useDeferredShow } from "../hooks/useDeferredShow.ts";
 import { subscribeSse, subscribeSseOnce } from "../sse.ts";
 import { dialog } from "../ui/dialog.tsx";
@@ -92,10 +97,16 @@ export function createAppState() {
     };
   }
 
+  type ReplyContext = {
+    inReplyTo: string;
+    references: string[];
+  };
+
   const [composeField, setComposeField] = createSignal<ComposeField>("to");
   const [composeTo, setComposeTo] = createSignal("");
   const [composeSubject, setComposeSubject] = createSignal("");
   const [composeBody, setComposeBody] = createSignal("");
+  const [replyContext, setReplyContext] = createSignal<ReplyContext | null>(null);
   let toInput: InputRenderable | undefined;
   let subjectInput: InputRenderable | undefined;
   let bodyArea: TextareaRenderable | undefined;
@@ -104,8 +115,19 @@ export function createAppState() {
   const [composeStatus, setComposeStatus] = createSignal("tab field · ctrl+s send · esc close");
   const composeOpen = () => dialog.has("compose");
 
+  function mountComposePrefill(prefill: { to: string; subject: string; text: string }, field: ComposeField) {
+    setComposeTo(prefill.to);
+    setComposeSubject(prefill.subject);
+    setComposeBody(prefill.text);
+    toInput?.setText(prefill.to);
+    subjectInput?.setText(prefill.subject);
+    bodyArea?.setText(prefill.text);
+    setComposeField(field);
+  }
+
   async function openCompose() {
     if (composeOpen()) return;
+    setReplyContext(null);
     let prefill = { to: "", subject: "", text: "" };
     try {
       const draft = await fetchCurrentDraft();
@@ -113,13 +135,7 @@ export function createAppState() {
     } catch {
       // Daemon unreachable or corrupt draft — start empty.
     }
-    setComposeTo(prefill.to);
-    setComposeSubject(prefill.subject);
-    setComposeBody(prefill.text);
-    toInput?.setText(prefill.to);
-    subjectInput?.setText(prefill.subject);
-    bodyArea?.setText(prefill.text);
-    setComposeField("to");
+    mountComposePrefill(prefill, "to");
     setComposeStatus(
       prefill.to || prefill.subject || prefill.text
         ? "draft restored · tab field · ctrl+s send · esc close"
@@ -129,7 +145,47 @@ export function createAppState() {
       id: "compose",
       slot: "content",
       element: <ComposeOverlay />,
-      onClose: () => setComposeSending(false),
+      onClose: () => {
+        setComposeSending(false);
+        setReplyContext(null);
+      },
+    });
+  }
+
+  async function openReply() {
+    if (composeOpen()) return;
+    const m = currentMsg();
+    if (!m) { flashToast("no message to reply to", "warning"); return; }
+    const b = body();
+    if (!b) { flashToast("body still loading — try again in a moment", "warning"); return; }
+    if (!b.messageId) {
+      flashToast("no message-id on this message — sending without threading", "warning");
+    }
+
+    const to = m.fromEmail ?? "";
+    const subject = buildReplySubject(m.subject);
+    const quoted = buildQuotedBody(m, b.text ?? "");
+    const references = buildReferences(b.references, b.messageId);
+
+    // Drop any unrelated draft so the reply doesn't fight with stale compose state.
+    await deleteCurrentDraft().catch(() => {});
+    lastSavedKey = "";
+
+    setReplyContext(b.messageId ? { inReplyTo: b.messageId, references } : null);
+    mountComposePrefill({ to, subject, text: quoted }, to ? "body" : "to");
+    setComposeStatus(
+      b.messageId
+        ? `replying to ${m.fromName ?? m.fromEmail ?? "sender"} · ctrl+s send · esc close`
+        : "reply without threading · ctrl+s send · esc close",
+    );
+    dialog.open({
+      id: "compose",
+      slot: "content",
+      element: <ComposeOverlay />,
+      onClose: () => {
+        setComposeSending(false);
+        setReplyContext(null);
+      },
     });
   }
 
@@ -182,13 +238,20 @@ export function createAppState() {
     setComposeStatus("sending…");
     if (draftSaveTimer) { clearTimeout(draftSaveTimer); draftSaveTimer = null; }
     try {
-      const res = await sendDraft({ to, subject, text });
+      const reply = replyContext();
+      const res = await sendDraft({
+        to,
+        subject,
+        text,
+        ...(reply ? { inReplyTo: reply.inReplyTo, references: reply.references } : {}),
+      });
       flashToast(`sent to ${res.accepted.join(", ")}`, "success");
       lastSavedKey = "";
       await deleteCurrentDraft().catch(() => {});
       setComposeTo("");
       setComposeSubject("");
       setComposeBody("");
+      setReplyContext(null);
       closeCompose();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -577,8 +640,10 @@ export function createAppState() {
 
     // actions
     openCompose,
+    openReply,
     closeCompose,
     doSend,
+    replyContext,
     nextField,
     openSearch,
     closeSearch,

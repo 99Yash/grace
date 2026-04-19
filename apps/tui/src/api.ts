@@ -27,6 +27,9 @@ export type Body = {
   attachments: { filename: string | null; contentType: string; size: number }[];
   sizeBytes: number;
   cached: boolean;
+  messageId: string | null;
+  inReplyTo: string | null;
+  references: string[];
 };
 
 export type Capabilities = { w3m: boolean };
@@ -105,7 +108,13 @@ export async function mutateMessage(gmMsgid: string, action: MutateAction): Prom
   return { removed: Boolean((r.data as { removed?: boolean })?.removed) };
 }
 
-export async function sendDraft(draft: { to: string; subject: string; text: string }): Promise<SendResult> {
+export async function sendDraft(draft: {
+  to: string;
+  subject: string;
+  text: string;
+  inReplyTo?: string;
+  references?: string[];
+}): Promise<SendResult> {
   const r = await client.api.send.post(draft);
   if (r.error) throw r.error;
   return r.data as SendResult;

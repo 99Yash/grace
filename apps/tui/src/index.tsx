@@ -103,6 +103,7 @@ function Layout() {
         if (kb.match("mail.archive", e)) { void s.runMutation(m, "archive"); return; }
         if (kb.match("mail.trash", e)) { void s.runMutation(m, "trash"); return; }
       }
+      if (kb.match("reader.reply", e)) { void s.openReply(); return; }
       if (kb.match("reader.w3m", e)) { s.triggerW3m(); return; }
       if (kb.match("reader.browser", e)) { s.openHtmlInBrowser(); return; }
       if (kb.match("reader.textMode", e)) { s.setTextMode(); return; }

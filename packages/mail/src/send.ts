@@ -7,6 +7,8 @@ export interface SendMessageOpts {
   subject: string;
   text: string;
   fromName?: string;
+  inReplyTo?: string;
+  references?: string[];
 }
 
 export interface SendMessageResult {
@@ -16,7 +18,7 @@ export interface SendMessageResult {
 }
 
 export async function sendMessage(opts: SendMessageOpts): Promise<SendMessageResult> {
-  const { email, accessToken, to, subject, text, fromName } = opts;
+  const { email, accessToken, to, subject, text, fromName, inReplyTo, references } = opts;
 
   const transport = nodemailer.createTransport({
     host: "smtp.gmail.com",
@@ -35,6 +37,10 @@ export async function sendMessage(opts: SendMessageOpts): Promise<SendMessageRes
       to,
       subject,
       text,
+      ...(inReplyTo ? { inReplyTo: bracketed(inReplyTo) } : {}),
+      ...(references && references.length > 0
+        ? { references: references.map(bracketed) }
+        : {}),
     });
     return {
       messageId: info.messageId,
@@ -44,6 +50,10 @@ export async function sendMessage(opts: SendMessageOpts): Promise<SendMessageRes
   } finally {
     transport.close();
   }
+}
+
+function bracketed(id: string): string {
+  return id.startsWith("<") && id.endsWith(">") ? id : `<${id}>`;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
