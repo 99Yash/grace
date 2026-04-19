@@ -74,10 +74,11 @@ export async function runBackfill(opts: BackfillOpts): Promise<{ done: number; t
           break;
         }
 
-        const olderUids = (await client.search(
+        const searchResult = await client.search(
           { uid: `1:${minUid - 1}` },
           { uid: true },
-        )) ?? [];
+        );
+        const olderUids = searchResult || [];
         if (olderUids.length === 0) {
           console.log(`[backfill] mailbox exhausted below uid=${minUid}`);
           break;

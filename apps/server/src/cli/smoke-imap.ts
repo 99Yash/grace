@@ -34,7 +34,6 @@ try {
   const mb = client.mailbox;
   if (typeof mb === "object") {
     console.log(`    exists:         ${mb.exists}`);
-    console.log(`    unseen:         ${mb.unseen ?? "(unset)"}`);
     console.log(`    uidValidity:    ${mb.uidValidity}`);
     console.log(`    uidNext:        ${mb.uidNext}`);
     console.log(`    highestModseq:  ${mb.highestModseq ?? "(unset)"}`);

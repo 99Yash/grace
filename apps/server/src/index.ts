@@ -26,25 +26,45 @@ async function probeExistingDaemon(): Promise<boolean> {
   }
 }
 
+async function shutdownExistingDaemon(): Promise<void> {
+  try {
+    await fetch(`http://${GRACE_HOST}:${GRACE_PORT}/api/shutdown`, {
+      method: "POST",
+      signal: AbortSignal.timeout(1000),
+    });
+  } catch {
+    // connection reset is expected — the old process is dying
+  }
+  // wait for the port to be released
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 150));
+    if (!(await probeExistingDaemon())) return;
+  }
+  throw new Error("failed to shut down existing grace daemon — kill it manually");
+}
+
 if (await probeExistingDaemon()) {
   console.log(
-    `grace daemon already running on http://${GRACE_HOST}:${GRACE_PORT} — exiting this instance to avoid duplicate IDLE connections`,
+    `grace daemon already running on http://${GRACE_HOST}:${GRACE_PORT} — shutting it down…`,
   );
-  process.exit(0);
+  await shutdownExistingDaemon();
 }
 
 openDb(`${GRACE_DATA_DIR}/grace.db`);
 getCapabilities();
 
 let idleWorker: IdleWorker | null = null;
+let idleStarting = false;
 const backfillAbort = new AbortController();
 
 async function startIdleIfPossible(): Promise<void> {
+  if (idleWorker || idleStarting) return;
   const email = loadActiveAccount();
   if (!email) {
-    console.log("[idle] skipped — no active account. run `bun run oauth:login`.");
+    console.log("[idle] skipped — no active account. sign in via the TUI.");
     return;
   }
+  idleStarting = true;
   try {
     const { clientId, clientSecret } = requireGoogleOAuth();
     const accessToken = await getFreshAccessToken({ email, clientId, clientSecret });
@@ -77,6 +97,8 @@ async function startIdleIfPossible(): Promise<void> {
     });
   } catch (err) {
     console.error("[idle] failed to start:", formatImapError(err));
+  } finally {
+    idleStarting = false;
   }
 }
 
@@ -108,6 +130,10 @@ const server = new Elysia()
   });
 
 void startIdleIfPossible();
+
+bus.subscribe((e) => {
+  if (e.type === "auth.signed-in" && !idleWorker) void startIdleIfPossible();
+});
 
 async function shutdown(signal: string) {
   console.log(`\n${signal} received, shutting down...`);

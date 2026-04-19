@@ -35,7 +35,7 @@ export function persistHeaderMessage(
       uid: msg.uid,
       subject: env?.subject ?? null,
       fromName: from?.name ?? null,
-      fromEmail: from && from.mailbox && from.host ? `${from.mailbox}@${from.host}` : null,
+      fromEmail: from?.address ?? null,
       date: env?.date ? new Date(env.date) : new Date(),
       snippet: null,
       flags: JSON.stringify(flagSet),

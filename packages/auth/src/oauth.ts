@@ -16,7 +16,7 @@ export interface TokenSet {
   refreshToken: string;
   expiresAt: number;
   scope: string;
-  idToken?: string;
+  idToken?: string | undefined;
 }
 
 export interface LoginFlowOpts {

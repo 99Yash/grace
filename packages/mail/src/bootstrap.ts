@@ -36,7 +36,7 @@ export async function bootstrapFolder(opts: BootstrapOpts): Promise<BootstrapRes
           .insert(folders)
           .values({
             name: folderName,
-            uidValidity: mb.uidValidity ?? null,
+            uidValidity: Number(mb.uidValidity),
             highestModseq: mb.highestModseq?.toString() ?? null,
           })
           .returning({ id: folders.id })
@@ -47,7 +47,7 @@ export async function bootstrapFolder(opts: BootstrapOpts): Promise<BootstrapRes
         folderId,
         inserted: 0,
         total: 0,
-        uidValidity: mb.uidValidity,
+        uidValidity: Number(mb.uidValidity),
         highestModseq: mb.highestModseq?.toString() ?? null,
       };
     }
@@ -66,7 +66,7 @@ export async function bootstrapFolder(opts: BootstrapOpts): Promise<BootstrapRes
 
     db.update(folders)
       .set({
-        uidValidity: mb.uidValidity ?? null,
+        uidValidity: Number(mb.uidValidity),
         highestModseq: mb.highestModseq?.toString() ?? null,
         lastSyncedAt: new Date(),
       })
@@ -79,7 +79,7 @@ export async function bootstrapFolder(opts: BootstrapOpts): Promise<BootstrapRes
       folderId,
       inserted,
       total,
-      uidValidity: mb.uidValidity,
+      uidValidity: Number(mb.uidValidity),
       highestModseq: mb.highestModseq?.toString() ?? null,
     };
   } finally {
