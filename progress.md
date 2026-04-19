@@ -4,7 +4,16 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 ## Timeline
 
-### 2026-04-19 (latest) — M8 attachments
+### 2026-04-19 (latest) — M9 triage mode
+
+- **`shift+t` opens triage.** Dialog with `slot="content"`, so the sidebar stays put but the list + reader split is replaced by a fullscreen one-at-a-time view (header: `triage · <folder>` + position `N/total`; body: the existing `Reader` component). `openTriage` seeds `triageIndex` from the list's current `selected`, so you pick up where you were.
+- **The pending overlay is the trick.** `runMutation(msg, "archive")` patches `pending[gmMsgid] = { removed: true }` synchronously before the IMAP await. `visibleMessages()` filters the row out immediately, so `triageIndex` now addresses the *next* message without any bookkeeping — space-bar through the inbox just works. `triageArchiveAndNext` only needs to catch the two boundary conditions: list went empty (close triage, toast "inbox empty") or index fell off the end (clamp to last, toast "end of inbox").
+- **Keybinds chosen to not collide.** `app.triage = shift+t` (lowercase `t` is `reader.textMode`). `triage.archiveNext = space`, `triage.archive = a`, `triage.reply = r`. Those three triage-specific bindings only match inside the triage branch, which returns for unhandled keys — so `r` doesn't hijack `app.refresh` outside triage. `mail.*` bindings (m/s/e/#) still mutate the current message; `reader.toggleQuotes` (z) still folds quoted text. `app.help` / `app.palette` / `app.themes` are whitelisted through the triage branch so `?` / `:` / `<leader>+t` remain available mid-triage. `esc` closes via DialogHost.
+- **bodySource gate.** The body resource used to gate on `readerOpen()` only; now it also fires when `triageOpen()` is true. Same cache, same fetch path — triage isn't a separate reader.
+- **Close semantics.** `onClose` writes `triageIndex` back into `selected` so the list lands on the last triaged row. A `createEffect` clamps `triageIndex` to `visibleMessages().length - 1` when the list shrinks mid-triage (new mail via IDLE, a background mutation refetch).
+- **Palette + help.** "Triage inbox" registered as a suggested command. Help dialog gets a `Triage` group with entries for all four triage keybinds. HelpBar carries a dedicated mode hint; default list-mode hint now advertises `T triage`.
+
+### 2026-04-19 — M8 attachments
 
 - **`alt+a` reveals an `Attach:` row.** Hidden by default, same progressive-disclosure pattern as Cc / Bcc — compose skeleton stays 3 rows + body for the common case. Input accepts a comma-separated list of file paths with `~/` shorthand; placeholder shows the shape. Tab order pulls the row in between Bcc and Subject when visible.
 - **Server validates before SMTP.** `POST /api/send` now takes an optional `attachments: string[]`; `resolveAttachments` expands `~`, resolves to absolute, `stat`s each entry, and 400s with `attachment not found: <path>` or `attachment not a file: <path>` before any OAuth token spin or SMTP dial. Nodemailer then does the actual reading at send time via `{ filename: basename, path: abs }`.
@@ -151,4 +160,4 @@ Smoke tests:
 
 ## Next
 
-M9 — triage mode (one-at-a-time fullscreen, space-through inbox) and/or M12 — network resilience (IDLE reconnect-with-backoff is the first unblocker for per-folder IDLE in M7). M8 is essentially feature-complete now; remaining gaps (HTML bodies, send-via-SSE) are polish.
+M10 — command palette is already effectively shipped as part of the refresh primitives (`:` opens a fuzzy `DialogSelect` over registered commands), so the obvious next piece is M12 — IDLE reconnect-with-backoff (also the first unblocker for per-folder IDLE in M7) or M11 — Claude features (summarize, draft, NL-select — needs `ANTHROPIC_API_KEY`). M8 and M9 are feature-complete.

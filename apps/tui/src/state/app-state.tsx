@@ -38,6 +38,7 @@ import {
 } from "../api.ts";
 import { ComposeOverlay } from "../components/Compose.tsx";
 import { SearchOverlay } from "../components/Search.tsx";
+import { TriageView } from "../components/Triage.tsx";
 import {
   buildQuotedBody,
   buildReferences,
@@ -65,6 +66,7 @@ export function createAppState() {
   const [selected, setSelected] = createSignal(0);
   const [readerOpen, setReaderOpen] = createSignal(false);
   const [activeMsg, setActiveMsg] = createSignal<Message | null>(null);
+  const [triageIndex, setTriageIndex] = createSignal(0);
   const [lastUpdated, setLastUpdated] = createSignal<number | null>(null);
   const [liveStatus, setLiveStatus] = createSignal<LiveStatus>("connecting");
   const [newFlash, setNewFlash] = createSignal<string | null>(null);
@@ -408,7 +410,14 @@ export function createAppState() {
       .map((m) => applyPending(m));
   };
 
+  const triageOpen = () => dialog.has("triage");
+
   const currentMsg = (): Message | null => {
+    if (triageOpen()) {
+      const list = visibleMessages();
+      if (list.length === 0) return null;
+      return list[triageIndex()] ?? null;
+    }
     const override = activeMsg();
     if (override) return applyPending(override);
     const list = visibleMessages();
@@ -417,7 +426,7 @@ export function createAppState() {
   };
 
   const bodySource = () => {
-    if (!readerOpen()) return null;
+    if (!readerOpen() && !triageOpen()) return null;
     const m = currentMsg();
     return m ? m.gmMsgid : null;
   };
@@ -579,6 +588,9 @@ export function createAppState() {
     const list = visibleMessages();
     if (messages()) setLastUpdated(Date.now());
     if (selected() >= list.length) setSelected(Math.max(0, list.length - 1));
+    if (triageOpen() && triageIndex() >= list.length) {
+      setTriageIndex(Math.max(0, list.length - 1));
+    }
   });
 
   async function switchFolder(path: string) {
@@ -655,6 +667,70 @@ export function createAppState() {
       patchPending(msg.gmMsgid, { read: before.read, starred: before.starred, removed: false });
       clearPending(msg.gmMsgid);
       flashToast(`${action} failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+    }
+  }
+
+  function openTriage() {
+    if (triageOpen()) return;
+    const list = visibleMessages();
+    if (list.length === 0) {
+      flashToast("no mail to triage", "warning");
+      return;
+    }
+    const idx = Math.min(Math.max(0, selected()), list.length - 1);
+    setTriageIndex(idx);
+    setReaderOpen(false);
+    setActiveMsg(null);
+    closeSearch();
+    setSidebarFocused(false);
+    dialog.open({
+      id: "triage",
+      slot: "content",
+      element: <TriageView />,
+      onClose: () => {
+        const remaining = visibleMessages();
+        if (remaining.length > 0) {
+          setSelected(Math.min(triageIndex(), remaining.length - 1));
+        }
+      },
+    });
+  }
+
+  function closeTriage() {
+    dialog.close("triage");
+  }
+
+  function triageNext() {
+    const list = visibleMessages();
+    if (list.length === 0) { closeTriage(); return; }
+    const next = triageIndex() + 1;
+    if (next >= list.length) {
+      flashToast("end of inbox", "info");
+      return;
+    }
+    setTriageIndex(next);
+  }
+
+  function triagePrev() {
+    setTriageIndex((v) => Math.max(0, v - 1));
+  }
+
+  function triageArchiveAndNext() {
+    const m = currentMsg();
+    if (!m) return;
+    // runMutation patches pending synchronously, which shrinks visibleMessages().
+    // triageIndex stays put → now points at the next message. If we were at the
+    // end, the index falls off the list and triage closes itself.
+    void runMutation(m, "archive");
+    const remaining = visibleMessages();
+    if (remaining.length === 0) {
+      flashToast("inbox empty", "success");
+      closeTriage();
+      return;
+    }
+    if (triageIndex() >= remaining.length) {
+      setTriageIndex(remaining.length - 1);
+      flashToast("end of inbox", "info");
     }
   }
 
@@ -782,6 +858,8 @@ export function createAppState() {
     searchSelected,
     searchPhase,
     searchError,
+    triageOpen,
+    triageIndex,
 
     // setters (direct)
     setSidebarFocused,
@@ -811,6 +889,11 @@ export function createAppState() {
     openSearch,
     closeSearch,
     openSelectedHit,
+    openTriage,
+    closeTriage,
+    triageNext,
+    triagePrev,
+    triageArchiveAndNext,
     switchFolder,
     runMutation,
     applyLabelChange,

@@ -67,6 +67,36 @@ function Layout() {
       return;
     }
 
+    // Triage owns the whole screen; route its keys before list-mode handlers.
+    if (s.triageOpen()) {
+      if (kb.match("triage.archiveNext", e)) { e.preventDefault(); s.triageArchiveAndNext(); return; }
+      if (kb.match("triage.reply", e)) { void s.openReply(); return; }
+      if (kb.match("triage.archive", e)) {
+        const m = s.currentMsg();
+        if (m) void s.runMutation(m, "archive");
+        return;
+      }
+      if (kb.match("nav.down", e)) { s.triageNext(); return; }
+      if (kb.match("nav.up", e)) { s.triagePrev(); return; }
+      const m = s.currentMsg();
+      if (m) {
+        if (kb.match("mail.toggleRead", e)) { void s.runMutation(m, "toggle-read"); return; }
+        if (kb.match("mail.toggleStar", e)) { void s.runMutation(m, "toggle-star"); return; }
+        if (kb.match("mail.archive", e)) { void s.runMutation(m, "archive"); return; }
+        if (kb.match("mail.trash", e)) { void s.runMutation(m, "trash"); return; }
+      }
+      if (kb.match("reader.toggleQuotes", e)) { s.toggleQuotes(); return; }
+      if (kb.match("app.help", e)) { openHelp(); return; }
+      if (kb.match("app.palette", e)) { openPalette(); return; }
+      if (kb.match("app.themes", e)) { openThemes(); return; }
+      return;
+    }
+
+    if (kb.match("app.triage", e) && !s.readerOpen() && !s.searchOpen() && !s.composeOpen()) {
+      s.openTriage();
+      return;
+    }
+
     if (kb.match("sidebar.toggle", e) && !s.searchOpen() && !s.readerOpen()) {
       s.setSidebarFocused((f) => !f);
       return;

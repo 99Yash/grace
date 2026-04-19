@@ -17,11 +17,14 @@ export function HelpBar() {
       backgroundColor={t.background}
     >
       <text fg={t.textFaint} flexGrow={1}>
-        <Switch fallback="? help · tab folders · j/k nav · enter open · c compose · m read · s star · e archive · # trash · l label · / search">
+        <Switch fallback="? help · tab folders · j/k nav · enter open · c compose · T triage · m read · s star · e archive · # trash · l label · / search">
           <Match when={s.auth.error}>enter/r retry · ctrl+c exit</Match>
           <Match when={s.auth() && !s.auth()!.signedIn}>enter authorize · ctrl+c exit</Match>
           <Match when={s.composeOpen()}>
             tab field · alt+c cc · alt+b bcc · alt+a attach · ctrl+s send · esc close
+          </Match>
+          <Match when={s.triageOpen()}>
+            space archive+next · a archive · r reply · j/k nav · m read · s star · # trash · esc exit
           </Match>
           <Match when={s.sidebarFocused()}>
             j/k nav · enter switch · tab/esc back to list

@@ -30,6 +30,14 @@ export function CommandRegistry() {
         onSelect: () => s.openSearch(),
       },
       {
+        title: "Triage inbox",
+        value: "app.triage",
+        category: "Mail",
+        keybind: "app.triage",
+        suggested: true,
+        onSelect: () => s.openTriage(),
+      },
+      {
         title: "Switch folder",
         value: "folder.switch",
         category: "View",

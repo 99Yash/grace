@@ -16,7 +16,7 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M6 | Mutations (archive / read / star / trash / label) | ✅ done | optimistic UI + IMAP via `applyMutation`; `l` toggles Gmail labels via X-GM-LABELS STORE |
 | M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; label pills in row; per-folder IDLE deferred |
 | M8 | Compose + SMTP send | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill with threading; Cc/Bcc fields (alt+c / alt+b); attachments (alt+a, comma-separated paths) |
-| M9 | Triage mode | ⬜ | fullscreen one-at-a-time, space-bar through inbox |
+| M9 | Triage mode | ✅ done | fullscreen `shift+t`; space archive+next, a archive, r reply, j/k nav, m/s/#/e mutate, esc exit |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
 | M11 | Claude features | ⬜ | summarize, draft, NL-select (`. "urgent from stripe"`) |
 | M12 | Network resilience + polish | ⬜ | IDLE reconnect-with-backoff, error recovery, docs |
@@ -89,11 +89,16 @@ Landed: `c` opens a full-screen compose overlay (sidebar stays visible). Fields:
 - **Deferred** Reply context survives compose close — closing mid-reply keeps the text in the draft file but drops the threading headers (next open becomes a plain compose). Acceptable for first pass; fix when draft records carry reply metadata.
 - **Deferred** HTML bodies; sending progress via SSE rather than awaited POST.
 
-## M9 — Triage mode
+## M9 — Triage mode (done)
 
-- Dedicated fullscreen view. One email at a time. Three primary actions shown.
-- Space = next, keep-and-archive. `a` = archive. `r` = reply (opens compose).
-- Inspired by Readdle's Spark / Superhuman.
+Landed: `shift+t` opens a fullscreen triage dialog (content-slot, so sidebar stays visible but the list+reader split is replaced). Header shows `triage · <folder>` + position `N/total`. Body is the existing `Reader` component driven by a new `triageIndex` signal instead of list `selected`. The pending-overlay removal already shrinks `visibleMessages()` on archive, so `triageIndex` naturally points at the next message after mutation — no bookkeeping needed.
+
+- **M9-01 ✅** `triageOpen` / `triageIndex` signals + `openTriage` / `closeTriage` / `triageNext` / `triagePrev` / `triageArchiveAndNext` in `app-state.tsx`. `openTriage` initializes `triageIndex` from `selected` (clamped), clears reader/search/activeMsg/sidebar focus before opening the dialog. `onClose` writes `triageIndex` back into `selected` so the list lands on the last triaged row.
+- **M9-02 ✅** `components/Triage.tsx` — full-height column with header bar and the `Reader` component under a `currentMsg()` `Show` guard. `bodySource()` now gates on `readerOpen() || triageOpen()` so the body resource fetches in triage mode.
+- **M9-03 ✅** Keybinds: `app.triage = "shift+t"`, `triage.archiveNext = "space"`, `triage.archive = "a"`, `triage.reply = "r"`. Triage keyboard branch in `index.tsx` routes its own keys first (returns for unhandled), but lets `app.help` / `app.palette` / `app.themes` through so `?` / `:` / `<leader>+t` still work mid-triage. `esc` closes via DialogHost. `mail.*` bindings (m/s/e/#) still mutate the current message.
+- **M9-04 ✅** `triageArchiveAndNext`: fires `runMutation(msg, "archive")` (pending patch applies synchronously), then if the resulting list is empty closes triage with "inbox empty" toast; if index fell off the end, clamps to last and toasts "end of inbox".
+- **M9-05 ✅** Clamp effect: the same `createEffect` that clamps `selected` when the list shrinks now also clamps `triageIndex` while triage is open (e.g. new mail arriving via IDLE during triage).
+- **M9-06 ✅** "Triage inbox" in the command palette (suggested), "Triage" group + row labels in the help dialog, dedicated mode hint in `HelpBar` (`space archive+next · a archive · r reply · j/k nav · m read · s star · # trash · esc exit`) and a `T triage` chip in the default list-mode hint.
 
 ## M10 — Command palette
 
