@@ -49,6 +49,11 @@ function Layout() {
         s.toggleComposeBcc();
         return;
       }
+      if (kb.match("compose.toggleAttach", e)) {
+        e.preventDefault();
+        s.toggleComposeAttachments();
+        return;
+      }
       if (kb.match("compose.prevField", e)) {
         e.preventDefault();
         s.setComposeField((f) => s.nextField(f, true));

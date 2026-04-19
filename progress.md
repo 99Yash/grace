@@ -4,7 +4,15 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 ## Timeline
 
-### 2026-04-19 (latest) — M8 Cc / Bcc
+### 2026-04-19 (latest) — M8 attachments
+
+- **`alt+a` reveals an `Attach:` row.** Hidden by default, same progressive-disclosure pattern as Cc / Bcc — compose skeleton stays 3 rows + body for the common case. Input accepts a comma-separated list of file paths with `~/` shorthand; placeholder shows the shape. Tab order pulls the row in between Bcc and Subject when visible.
+- **Server validates before SMTP.** `POST /api/send` now takes an optional `attachments: string[]`; `resolveAttachments` expands `~`, resolves to absolute, `stat`s each entry, and 400s with `attachment not found: <path>` or `attachment not a file: <path>` before any OAuth token spin or SMTP dial. Nodemailer then does the actual reading at send time via `{ filename: basename, path: abs }`.
+- **Error path routes focus.** `doSend` catches the 400 and, if the message starts with `attachment `, drops `composeField` back to `attachments` so the caret lands on the row the user needs to fix.
+- **Draft persistence.** `DraftRecord.attachments` (optional string) joins `cc` / `bcc` as a sibling; JSONL writer skips the field when empty. Restored on reopen so you can close-to-park a long path list.
+- **Wire.** `SendMessageOpts.attachments` forwards straight through to nodemailer, which handles multipart encoding. No new deps needed.
+
+### 2026-04-19 — M8 Cc / Bcc
 
 - **Hidden by default, toggled with `alt+c` / `alt+b`.** Gmail and Superhuman both hide Cc/Bcc until requested, and the skeleton stays quieter that way — the compose overlay is 3 rows + body for the common case and grows only when needed. `ctrl+c` was the obvious pick but it's `app.quit`; `ctrl+b` is the leader chord. `alt+c` / `alt+b` are free and don't blur focus mid-toggle.
 - **Tab cycles the visible fields only.** `nextField` builds its order dynamically from `composeShowCc()` / `composeShowBcc()` — toggling Cc on inserts it between To and Subject; turning it back off drops it and, if focus was on that row, pops back to To. Prevents the "I pressed tab and landed on an invisible field" confusion.
@@ -143,4 +151,4 @@ Smoke tests:
 
 ## Next
 
-M9 — triage mode (one-at-a-time fullscreen, space-through inbox) and/or M10 — command palette. M8 follow-ups (draft persistence, reply pre-fill) can fold in before M9 if needed.
+M9 — triage mode (one-at-a-time fullscreen, space-through inbox) and/or M12 — network resilience (IDLE reconnect-with-backoff is the first unblocker for per-folder IDLE in M7). M8 is essentially feature-complete now; remaining gaps (HTML bodies, send-via-SSE) are polish.

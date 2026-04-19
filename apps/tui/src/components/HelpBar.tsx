@@ -21,7 +21,7 @@ export function HelpBar() {
           <Match when={s.auth.error}>enter/r retry · ctrl+c exit</Match>
           <Match when={s.auth() && !s.auth()!.signedIn}>enter authorize · ctrl+c exit</Match>
           <Match when={s.composeOpen()}>
-            tab field · alt+c cc · alt+b bcc · ctrl+s send · esc close
+            tab field · alt+c cc · alt+b bcc · alt+a attach · ctrl+s send · esc close
           </Match>
           <Match when={s.sidebarFocused()}>
             j/k nav · enter switch · tab/esc back to list

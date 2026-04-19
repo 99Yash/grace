@@ -10,6 +10,7 @@ export type DraftRecord = {
   bcc?: string;
   subject: string;
   text: string;
+  attachments?: string;
   updatedAt: number;
 };
 
@@ -61,6 +62,9 @@ export const draftRoutes = new Elysia({ prefix: "/drafts" })
         ...(body.bcc && body.bcc.length > 0 ? { bcc: body.bcc } : {}),
         subject: body.subject,
         text: body.text,
+        ...(body.attachments && body.attachments.length > 0
+          ? { attachments: body.attachments }
+          : {}),
         updatedAt: Date.now(),
       };
       await writeCurrentDraft(record);
@@ -73,6 +77,7 @@ export const draftRoutes = new Elysia({ prefix: "/drafts" })
         bcc: t.Optional(t.String()),
         subject: t.String(),
         text: t.String(),
+        attachments: t.Optional(t.String()),
       }),
     },
   )

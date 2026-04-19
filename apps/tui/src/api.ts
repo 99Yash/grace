@@ -53,7 +53,7 @@ export interface SendResult {
   rejected: string[];
 }
 
-export type ComposeField = "to" | "cc" | "bcc" | "subject" | "body";
+export type ComposeField = "to" | "cc" | "bcc" | "attachments" | "subject" | "body";
 
 export async function fetchAuth() {
   const r = await client.api.auth.status.get();
@@ -125,6 +125,7 @@ export async function sendDraft(draft: {
   text: string;
   inReplyTo?: string;
   references?: string[];
+  attachments?: string[];
 }): Promise<SendResult> {
   const r = await client.api.send.post(draft);
   if (r.error) throw r.error;
@@ -144,6 +145,7 @@ export async function saveCurrentDraft(draft: {
   bcc?: string;
   subject: string;
   text: string;
+  attachments?: string;
 }): Promise<void> {
   const r = await client.api.drafts.current.put(draft);
   if (r.error) throw r.error;

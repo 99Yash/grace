@@ -51,9 +51,13 @@ export function ComposeOverlay() {
           flexGrow={1}
           flexShrink={1}
         />
-        <Show when={!s.composeShowCc() || !s.composeShowBcc()}>
+        <Show when={!s.composeShowCc() || !s.composeShowBcc() || !s.composeShowAttachments()}>
           <text fg={t.textFaint} flexShrink={0}>
-            {`  ${!s.composeShowCc() ? "alt+c cc" : ""}${!s.composeShowCc() && !s.composeShowBcc() ? " · " : ""}${!s.composeShowBcc() ? "alt+b bcc" : ""}`}
+            {"  " + [
+              s.composeShowCc() ? null : "alt+c cc",
+              s.composeShowBcc() ? null : "alt+b bcc",
+              s.composeShowAttachments() ? null : "alt+a attach",
+            ].filter(Boolean).join(" · ")}
           </text>
         </Show>
       </box>
@@ -109,6 +113,35 @@ export function ComposeOverlay() {
             backgroundColor="transparent"
             focusedBackgroundColor="transparent"
             placeholder="comma-separated"
+            placeholderColor={t.textFaint}
+            flexGrow={1}
+            flexShrink={1}
+          />
+        </box>
+      </Show>
+      <Show when={s.composeShowAttachments()}>
+        <box
+          flexDirection="row"
+          height={1}
+          flexShrink={0}
+          paddingLeft={1}
+          paddingRight={1}
+          backgroundColor={field() === "attachments" ? t.field : "transparent"}
+        >
+          <text fg={field() === "attachments" ? t.text : t.textSubtle} width={9} flexShrink={0}>
+            Attach:
+          </text>
+          <input
+            ref={s.mountAttachmentsInput}
+            focused={field() === "attachments"}
+            onInput={s.writeComposeAttachments}
+            onSubmit={() => s.setComposeField((f) => s.nextField(f))}
+            textColor={t.textBright}
+            focusedTextColor={t.textBright}
+            cursorColor={cursor()}
+            backgroundColor="transparent"
+            focusedBackgroundColor="transparent"
+            placeholder="~/path/to/file.pdf, /abs/other.png"
             placeholderColor={t.textFaint}
             flexGrow={1}
             flexShrink={1}

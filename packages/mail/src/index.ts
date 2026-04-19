@@ -28,6 +28,7 @@ export { listFolders, type FolderEntry } from "./list-folders.ts";
 export {
   sendMessage,
   parseRecipients,
+  type SendMessageAttachment,
   type SendMessageOpts,
   type SendMessageResult,
 } from "./send.ts";

@@ -1,5 +1,10 @@
 import nodemailer from "nodemailer";
 
+export interface SendMessageAttachment {
+  filename: string;
+  path: string;
+}
+
 export interface SendMessageOpts {
   email: string;
   accessToken: string;
@@ -11,6 +16,7 @@ export interface SendMessageOpts {
   fromName?: string;
   inReplyTo?: string;
   references?: string[];
+  attachments?: SendMessageAttachment[];
 }
 
 export interface SendMessageResult {
@@ -20,7 +26,19 @@ export interface SendMessageResult {
 }
 
 export async function sendMessage(opts: SendMessageOpts): Promise<SendMessageResult> {
-  const { email, accessToken, to, cc, bcc, subject, text, fromName, inReplyTo, references } = opts;
+  const {
+    email,
+    accessToken,
+    to,
+    cc,
+    bcc,
+    subject,
+    text,
+    fromName,
+    inReplyTo,
+    references,
+    attachments,
+  } = opts;
 
   const transport = nodemailer.createTransport({
     host: "smtp.gmail.com",
@@ -45,6 +63,7 @@ export async function sendMessage(opts: SendMessageOpts): Promise<SendMessageRes
       ...(references && references.length > 0
         ? { references: references.map(bracketed) }
         : {}),
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
     });
     return {
       messageId: info.messageId,

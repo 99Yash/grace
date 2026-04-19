@@ -45,6 +45,7 @@ const LABELS: Record<string, string> = {
   "compose.prevField": "Previous field",
   "compose.toggleCc": "Toggle Cc field",
   "compose.toggleBcc": "Toggle Bcc field",
+  "compose.toggleAttach": "Toggle Attachments field",
   "search.next": "Next result",
   "search.prev": "Previous result",
 };
