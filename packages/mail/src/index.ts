@@ -16,11 +16,13 @@ export {
 export { FETCH_HEADER_FIELDS, persistHeaderMessage } from "./persist.ts";
 export {
   applyMutation,
+  applyLabelChange,
   GMAIL_ALL_MAIL,
   GMAIL_TRASH,
   type MutationAction,
   type MutationTarget,
   type ApplyMutationResult,
+  type LabelChange,
 } from "./mutations.ts";
 export { listFolders, type FolderEntry } from "./list-folders.ts";
 export {

@@ -4,6 +4,14 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 ## Timeline
 
+### 2026-04-19 (later still) — M6 label toggle
+
+- **`l` opens a label picker.** New `apps/tui/src/ui/label-dialog.tsx` reuses `DialogSelect` to show `orderedFolders()` minus INBOX and the special-use folders that are either represented elsewhere in the UI (Starred = `s`, Trash = `#`, etc.) or not useful as labels (Drafts/Sent/Junk/All). Currently-applied labels group under "Applied" with `✓ applied · enter removes`; unapplied ones sit under "Labels" with `enter applies`. Enter toggles.
+- **Backend: `POST /api/messages/:gmMsgid/labels`** accepts `{ add?: string[], remove?: string[] }`. Resolves the message's source folder, opens via `withActionClient`, applies through `applyLabelChange`, then writes back the deduped label list to `messages.labels` in SQLite and fans out `mail.updated`. Returns `{ ok: true, labels }`.
+- **`packages/mail/src/mutations.ts` — `applyLabelChange`.** Calls imapflow's `messageFlagsAdd/Remove` with `{ uid: true, useLabels: true }` — the `useLabels` flag turns the underlying STORE into `+X-GM-LABELS` / `-X-GM-LABELS` and silently no-ops if the server doesn't advertise `X-GM-EXT-1`. The plan note about needing `client.exec` was stale; imapflow exposes this at the high-level API already.
+- **No optimistic overlay for labels.** Add/remove typically round-trips in <500ms and the pill re-renders from the authoritative list after `mail.updated` triggers a refetch. A toast confirms the action (`added [Work]` / `removed [Important]`). Error paths surface as a red toast with the IMAP error string — no local state to roll back.
+- **Palette + help.** `Toggle label…` registered in the command palette; `mail.label` row in the help dialog; `l label` added to both the list-mode and reader-mode help bar hints.
+
 ### 2026-04-19 (later) — M7 label pills in message rows
 
 - **Why.** Labels are the highest-signal piece of metadata Gmail gives us after read/star, and we were already storing them in `messages.labels` but only rendering them in the reader header. Inbox scan-time is where they actually help — "which of these is from work" — so they belong in the list row.
@@ -87,7 +95,6 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 - **No reconnect on network drop.** If WiFi dies, imapflow emits `close`; daemon logs it but doesn't re-establish IDLE. Restart server to recover. Fix in M12.
 - **Only INBOX is live.** No folder sidebar yet; no per-folder IDLE or backfill. Fix in M7.
-- **Can't act on messages.** Archive / star / trash / reply / compose all absent; only opening-flips-read works. Fix in M6 + M8.
 - **Search is INBOX-only and cap 50 remote UIDs.** No folder selector, no `[Gmail]/All Mail` crawl, no FTS5 yet. M5c-04 + M7 lift these.
 - **Search local phase uses `LIKE '%q%'`.** Doesn't parse Gmail operators (`from:x is:unread older_than:30d`) locally — those just go through to the remote phase. FTS5 virtual table over bodies is M5c-04.
 - **IMAP connection churn on dev restart.** Gmail caps at 15 concurrent. Mitigated by (1) port guard — `apps/server/src/index.ts` probes `/api/health` on boot and exits if a daemon is already running, so a second `bun run dev:server` can't silently pile on IDLE connections; (2) SIGHUP shutdown handler, so closing a terminal releases the slot cleanly; (3) switched server dev from `bun --hot` to `bun --watch` so each save does a full SIGTERM → clean logout → fresh IDLE instead of leaking the old one. If you do end up with stragglers: `ps -eo pid,etime,command | grep -E 'turbo.*-F server|apps/server/src/index'` then kill the PIDs.

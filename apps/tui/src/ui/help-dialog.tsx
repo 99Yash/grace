@@ -33,6 +33,7 @@ const LABELS: Record<string, string> = {
   "mail.toggleStar": "Toggle star",
   "mail.archive": "Archive",
   "mail.trash": "Trash",
+  "mail.label": "Toggle label",
   "reader.w3m": "Render rich (w3m)",
   "reader.browser": "Open in browser",
   "reader.reply": "Reply",

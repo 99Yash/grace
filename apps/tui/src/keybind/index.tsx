@@ -23,6 +23,7 @@ export const DEFAULT_KEYBINDS = {
   "mail.toggleStar": "s",
   "mail.archive": "e",
   "mail.trash": "#,shift+3",
+  "mail.label": "l",
   "reader.w3m": "v",
   "reader.browser": "shift+v",
   "reader.reply": "shift+r",

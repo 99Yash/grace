@@ -108,6 +108,15 @@ export async function mutateMessage(gmMsgid: string, action: MutateAction): Prom
   return { removed: Boolean((r.data as { removed?: boolean })?.removed) };
 }
 
+export async function labelMessage(
+  gmMsgid: string,
+  change: { add?: string[]; remove?: string[] },
+): Promise<{ labels: string[] }> {
+  const r = await client.api.messages({ gmMsgid }).labels.post(change);
+  if (r.error) throw r.error;
+  return { labels: ((r.data as { labels?: string[] })?.labels ?? []) };
+}
+
 export async function sendDraft(draft: {
   to: string;
   subject: string;

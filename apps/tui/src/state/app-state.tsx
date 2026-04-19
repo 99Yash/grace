@@ -25,6 +25,7 @@ import {
   fetchMessages,
   hitToMessage,
   importHit,
+  labelMessage,
   type Message,
   mutateMessage,
   type MutateAction,
@@ -480,6 +481,28 @@ export function createAppState() {
     if (idx >= 0) setFolderSelected(idx);
   });
 
+  async function applyLabelChange(
+    gmMsgid: string,
+    change: { add?: string[]; remove?: string[] },
+  ): Promise<void> {
+    const addCount = change.add?.length ?? 0;
+    const removeCount = change.remove?.length ?? 0;
+    if (addCount + removeCount === 0) return;
+    try {
+      await labelMessage(gmMsgid, change);
+      const noun =
+        addCount > 0 && removeCount === 0
+          ? `added ${labelJoin(change.add!)}`
+          : removeCount > 0 && addCount === 0
+            ? `removed ${labelJoin(change.remove!)}`
+            : "updated labels";
+      flashToast(noun, "success");
+      void refetch();
+    } catch (err) {
+      flashToast(`label failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+    }
+  }
+
   async function runMutation(msg: Message, action: MutateAction) {
     const before = { read: msg.read, starred: msg.starred };
     const willRemove = action === "archive" || action === "trash";
@@ -509,6 +532,12 @@ export function createAppState() {
 
   function flashToast(message: string, variant: ToastVariant = "info") {
     toast.show({ message, variant });
+  }
+
+  function labelJoin(arr: string[]): string {
+    const names = arr.map((l) => (l.startsWith("\\") ? l.slice(1) : l));
+    if (names.length === 1) return `[${names[0]}]`;
+    return `${names.length} labels`;
   }
 
   function triggerW3m() {
@@ -650,6 +679,7 @@ export function createAppState() {
     openSelectedHit,
     switchFolder,
     runMutation,
+    applyLabelChange,
     triggerW3m,
     openHtmlInBrowser,
     setTextMode,

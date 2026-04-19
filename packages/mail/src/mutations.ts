@@ -19,6 +19,11 @@ export interface ApplyMutationResult {
   removedFromSource: boolean;
 }
 
+export interface LabelChange {
+  add?: string[];
+  remove?: string[];
+}
+
 export async function applyMutation(
   client: ImapFlow,
   target: MutationTarget,
@@ -54,6 +59,44 @@ export async function applyMutation(
         if (!res) throw new Error(`trash move failed for uid ${uid}`);
         return { removedFromSource: true };
       }
+    }
+  } finally {
+    lock.release();
+  }
+}
+
+/**
+ * Apply Gmail X-GM-LABELS changes. Uses imapflow's STORE with
+ * `useLabels: true`, which gates on X-GM-EXT-1 capability and falls through
+ * silently on non-Gmail servers.
+ *
+ * Labels are the full IMAP path (e.g. `Work/Ops`, `\Important`). System
+ * labels use a leading backslash; user labels don't.
+ */
+export async function applyLabelChange(
+  client: ImapFlow,
+  target: MutationTarget,
+  change: LabelChange,
+): Promise<void> {
+  const add = (change.add ?? []).filter((s) => s.length > 0);
+  const remove = (change.remove ?? []).filter((s) => s.length > 0);
+  if (add.length === 0 && remove.length === 0) return;
+  const { folderName, uid } = target;
+  const lock = await client.getMailboxLock(folderName);
+  try {
+    if (add.length > 0) {
+      const ok = await client.messageFlagsAdd(String(uid), add, {
+        uid: true,
+        useLabels: true,
+      });
+      if (!ok) throw new Error(`add labels failed for uid ${uid}`);
+    }
+    if (remove.length > 0) {
+      const ok = await client.messageFlagsRemove(String(uid), remove, {
+        uid: true,
+        useLabels: true,
+      });
+      if (!ok) throw new Error(`remove labels failed for uid ${uid}`);
     }
   } finally {
     lock.release();

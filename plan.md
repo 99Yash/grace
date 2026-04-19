@@ -13,8 +13,8 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M5 | Message reader | ✅ done | Enter opens body; hybrid bodies (SQLite text + disk HTML/raw); HTML→text server-side fallback for marketing mail; `v` w3m (capability-gated) / `V` browser-eject; local read-flip |
 | M5b | Partial sync + progressive backfill | ✅ done | 1000-msg backfill worker, sync progress pill, `persist.ts` extraction, `/api/capabilities` |
 | M5c | Two-phase search (local + remote) | ✅ done | SQLite LIKE + Gmail `X-GM-RAW` stream-merge, `/` overlay (manual keystroke handling, no dropped first char), opportunistic import on remote-only open |
-| M6 | Mutations (archive / read / star / trash) | 🟡 partial | optimistic UI + IMAP via `applyMutation`; label-move deferred to M7 |
-| M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; label pills in row; per-folder IDLE + `l` label-move deferred |
+| M6 | Mutations (archive / read / star / trash / label) | ✅ done | optimistic UI + IMAP via `applyMutation`; `l` toggles Gmail labels via X-GM-LABELS STORE |
+| M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; label pills in row; per-folder IDLE deferred |
 | M8 | Compose + SMTP send | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill with threading; Cc/Bcc + attachments deferred |
 | M9 | Triage mode | ⬜ | fullscreen one-at-a-time, space-bar through inbox |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
@@ -64,7 +64,7 @@ Landed: `archive`, `toggle read`, `toggle star`, `trash`. Server-authoritative: 
 - **M6-03 ✅** TUI optimistic overlay — `pending: Record<gmMsgid, {read?, starred?, removed?}>` signal layered over the messages list via `visibleMessages()`. `runMutation()` patches overlay → posts → clears on success (or rolls back + toast on failure). Also short-circuits reader close when the open message is archived/trashed.
 - **M6-04 ✅** Reconcile on error: rollback + toast. SSE `mail.updated` also clears pending for that `gmMsgid` (list refetch returns authoritative state).
 - **M6-05 ✅** Keybinds from list view AND reader view: `m` toggle read, `s` toggle star, `e` archive, `#` trash. Help bar updated.
-- **Deferred** `l <label>` move — needs folder/label picker; revisit after M7's folder sidebar. Gmail label add/remove via `X-GM-LABELS` STORE isn't exposed by imapflow high-level API; either drop to `client.exec` or simulate via MOVE between label folders.
+- **M6-06 ✅** `l` toggle label — picker over `orderedFolders()` (excluding INBOX and noise-y special-use folders like Sent/Trash/Flagged), marks currently-applied labels in an "Applied" group. Enter adds or removes; implemented via `applyLabelChange` calling imapflow's `messageFlagsAdd/Remove` with `useLabels: true` (X-GM-LABELS STORE under the hood, gated on X-GM-EXT-1). `POST /api/messages/:gmMsgid/labels` accepts `{ add?, remove? }`, updates `messages.labels` in SQLite post-IMAP, and fans out `mail.updated` so open TUI windows refetch. No optimistic overlay — the round-trip is usually <500ms and a toast is enough.
 
 ## M7 — Folder sidebar + label pills (partial)
 
@@ -75,7 +75,6 @@ Landed: live Gmail folder list drives a left sidebar. Tab toggles sidebar ↔ li
 - **M7-03 ✅** TUI: 22-col left sidebar renders `orderedFolders()` (INBOX first, then Important/Starred/Drafts/Sent/All/Spam/Trash specialUse, then user labels alphabetical). Unread count appears in blue. Tab toggles focus — sidebar uses j/k nav, Enter switches. `activeFolder` signal drives the messages resource (auto-refetch on change). Switch clears pending overlay + selection + reader. `folder.sync.progress` filtered to the active folder. `mail.received` only flashes/refetches when its `folder` matches active; still refreshes folder list for unread counts.
 - **M7-04 ✅** Label pills in each row — `visibleLabels(labels, activeFolder, 2)` helper in `format.ts` filters out redundant Gmail system labels (`\Inbox` / `\Starred` / `\Unread` / `\Sent` / `\Draft(s)` / `\Trash` / `\Spam` / `\Junk` / `\Chat` / `\Muted`) plus the currently active folder (so viewing `Work` doesn't double-surface the `Work` pill). Remaining labels render as `[name]` chips before the subject (truncated to 14 chars each), capped at 2 with `+N` overflow. Hidden in compact (reader-open) mode so the 48-col list still fits.
 - **Deferred** Per-folder IDLE workers (needs folder-manager module + Gmail conn lifecycle + reconnect-on-close from M12).
-- **Deferred** `l <label>` move-to-label mutation (needs label picker + imapflow `X-GM-LABELS` via `client.exec`).
 
 ## M8 — Compose + SMTP (partial)
 

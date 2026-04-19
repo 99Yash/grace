@@ -8,6 +8,7 @@ import { eventRoutes } from "./routes/events.ts";
 import { folderRoutes } from "./routes/folders.ts";
 import { messageRoutes } from "./routes/messages.ts";
 import { mutateRoutes } from "./routes/mutate.ts";
+import { labelRoutes } from "./routes/labels.ts";
 import { importRoutes } from "./routes/import.ts";
 import { searchRoutes } from "./routes/search.ts";
 import { sendRoutes } from "./routes/send.ts";
@@ -30,6 +31,7 @@ export const app = new Elysia({ prefix: "/api" })
   .use(messageRoutes)
   .use(bodyRoutes)
   .use(mutateRoutes)
+  .use(labelRoutes)
   .use(importRoutes)
   .use(searchRoutes)
   .use(sendRoutes)

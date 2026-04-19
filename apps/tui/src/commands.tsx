@@ -3,6 +3,7 @@ import { useAppState } from "./state/app-state.tsx";
 import { commands, type CommandOption } from "./ui/command-registry.ts";
 import { openFolderPicker } from "./ui/folder-dialog.tsx";
 import { openHelp } from "./ui/help-dialog.tsx";
+import { openLabelPicker } from "./ui/label-dialog.tsx";
 import { openThemes } from "./ui/theme-dialog.tsx";
 
 export function CommandRegistry() {
@@ -66,6 +67,14 @@ export function CommandRegistry() {
         keybind: "mail.trash",
         enabled: hasMsg,
         onSelect: () => { if (m) void s.runMutation(m, "trash"); },
+      },
+      {
+        title: "Toggle label…",
+        value: "mail.label",
+        category: "Mail",
+        keybind: "mail.label",
+        enabled: hasMsg,
+        onSelect: () => openLabelPicker(),
       },
       {
         title: "Refresh inbox",

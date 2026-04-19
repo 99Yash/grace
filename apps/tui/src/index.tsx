@@ -14,6 +14,7 @@ import { ThemeProvider, useTheme } from "./theme/index.tsx";
 import { openPalette } from "./ui/command-palette.tsx";
 import { DialogHost, DialogSlot } from "./ui/dialog.tsx";
 import { openHelp } from "./ui/help-dialog.tsx";
+import { openLabelPicker } from "./ui/label-dialog.tsx";
 import { openThemes } from "./ui/theme-dialog.tsx";
 import { ToastHost } from "./ui/toast.tsx";
 
@@ -102,6 +103,7 @@ function Layout() {
         if (kb.match("mail.toggleStar", e)) { void s.runMutation(m, "toggle-star"); return; }
         if (kb.match("mail.archive", e)) { void s.runMutation(m, "archive"); return; }
         if (kb.match("mail.trash", e)) { void s.runMutation(m, "trash"); return; }
+        if (kb.match("mail.label", e)) { openLabelPicker(); return; }
       }
       if (kb.match("reader.reply", e)) { void s.openReply(); return; }
       if (kb.match("reader.w3m", e)) { s.triggerW3m(); return; }
@@ -138,6 +140,7 @@ function Layout() {
       if (kb.match("mail.toggleStar", e)) { void s.runMutation(m, "toggle-star"); return; }
       if (kb.match("mail.archive", e)) { void s.runMutation(m, "archive"); return; }
       if (kb.match("mail.trash", e)) { void s.runMutation(m, "trash"); return; }
+      if (kb.match("mail.label", e)) { openLabelPicker(); return; }
     }
   });
 
