@@ -4,6 +4,8 @@ export interface SendMessageOpts {
   email: string;
   accessToken: string;
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   text: string;
   fromName?: string;
@@ -18,7 +20,7 @@ export interface SendMessageResult {
 }
 
 export async function sendMessage(opts: SendMessageOpts): Promise<SendMessageResult> {
-  const { email, accessToken, to, subject, text, fromName, inReplyTo, references } = opts;
+  const { email, accessToken, to, cc, bcc, subject, text, fromName, inReplyTo, references } = opts;
 
   const transport = nodemailer.createTransport({
     host: "smtp.gmail.com",
@@ -35,6 +37,8 @@ export async function sendMessage(opts: SendMessageOpts): Promise<SendMessageRes
     const info = await transport.sendMail({
       from: fromName ? `"${fromName}" <${email}>` : email,
       to,
+      ...(cc && cc.length > 0 ? { cc } : {}),
+      ...(bcc && bcc.length > 0 ? { bcc } : {}),
       subject,
       text,
       ...(inReplyTo ? { inReplyTo: bracketed(inReplyTo) } : {}),

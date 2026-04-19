@@ -6,6 +6,8 @@ import { env } from "@grace/env/server";
 export type DraftRecord = {
   id: "current";
   to: string;
+  cc?: string;
+  bcc?: string;
   subject: string;
   text: string;
   updatedAt: number;
@@ -55,6 +57,8 @@ export const draftRoutes = new Elysia({ prefix: "/drafts" })
       const record: DraftRecord = {
         id: "current",
         to: body.to,
+        ...(body.cc && body.cc.length > 0 ? { cc: body.cc } : {}),
+        ...(body.bcc && body.bcc.length > 0 ? { bcc: body.bcc } : {}),
         subject: body.subject,
         text: body.text,
         updatedAt: Date.now(),
@@ -65,6 +69,8 @@ export const draftRoutes = new Elysia({ prefix: "/drafts" })
     {
       body: t.Object({
         to: t.String(),
+        cc: t.Optional(t.String()),
+        bcc: t.Optional(t.String()),
         subject: t.String(),
         text: t.String(),
       }),

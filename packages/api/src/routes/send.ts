@@ -24,6 +24,21 @@ export const sendRoutes = new Elysia().post(
       });
     }
 
+    const cc = parseRecipients(body.cc ?? "");
+    if (cc.invalid.length > 0) {
+      return status(400, {
+        error: `invalid Cc: ${cc.invalid.join(", ")}`,
+        invalid: cc.invalid,
+      });
+    }
+    const bcc = parseRecipients(body.bcc ?? "");
+    if (bcc.invalid.length > 0) {
+      return status(400, {
+        error: `invalid Bcc: ${bcc.invalid.join(", ")}`,
+        invalid: bcc.invalid,
+      });
+    }
+
     const subject = body.subject.trim();
     if (subject.length === 0) return status(400, { error: "subject required" });
     if (body.text.trim().length === 0) return status(400, { error: "body required" });
@@ -35,6 +50,8 @@ export const sendRoutes = new Elysia().post(
         email,
         accessToken,
         to: valid,
+        ...(cc.valid.length > 0 ? { cc: cc.valid } : {}),
+        ...(bcc.valid.length > 0 ? { bcc: bcc.valid } : {}),
         subject,
         text: body.text,
         ...(body.inReplyTo ? { inReplyTo: body.inReplyTo } : {}),
@@ -63,6 +80,8 @@ export const sendRoutes = new Elysia().post(
   {
     body: t.Object({
       to: t.String(),
+      cc: t.Optional(t.String()),
+      bcc: t.Optional(t.String()),
       subject: t.String(),
       text: t.String(),
       inReplyTo: t.Optional(t.String()),

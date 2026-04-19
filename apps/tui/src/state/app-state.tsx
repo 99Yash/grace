@@ -105,22 +105,39 @@ export function createAppState() {
 
   const [composeField, setComposeField] = createSignal<ComposeField>("to");
   const [composeTo, setComposeTo] = createSignal("");
+  const [composeCc, setComposeCc] = createSignal("");
+  const [composeBcc, setComposeBcc] = createSignal("");
   const [composeSubject, setComposeSubject] = createSignal("");
   const [composeBody, setComposeBody] = createSignal("");
+  const [composeShowCc, setComposeShowCc] = createSignal(false);
+  const [composeShowBcc, setComposeShowBcc] = createSignal(false);
   const [replyContext, setReplyContext] = createSignal<ReplyContext | null>(null);
   let toInput: InputRenderable | undefined;
+  let ccInput: InputRenderable | undefined;
+  let bccInput: InputRenderable | undefined;
   let subjectInput: InputRenderable | undefined;
   let bodyArea: TextareaRenderable | undefined;
   const [composeSending, setComposeSending] = createSignal(false);
   const showComposeSpinner = useDeferredShow(composeSending);
-  const [composeStatus, setComposeStatus] = createSignal("tab field · ctrl+s send · esc close");
+  const [composeStatus, setComposeStatus] = createSignal("tab field · alt+c cc · alt+b bcc · ctrl+s send");
   const composeOpen = () => dialog.has("compose");
 
-  function mountComposePrefill(prefill: { to: string; subject: string; text: string }, field: ComposeField) {
+  function mountComposePrefill(
+    prefill: { to: string; cc?: string; bcc?: string; subject: string; text: string },
+    field: ComposeField,
+  ) {
+    const cc = prefill.cc ?? "";
+    const bcc = prefill.bcc ?? "";
     setComposeTo(prefill.to);
+    setComposeCc(cc);
+    setComposeBcc(bcc);
     setComposeSubject(prefill.subject);
     setComposeBody(prefill.text);
+    setComposeShowCc(cc.length > 0);
+    setComposeShowBcc(bcc.length > 0);
     toInput?.setText(prefill.to);
+    ccInput?.setText(cc);
+    bccInput?.setText(bcc);
     subjectInput?.setText(prefill.subject);
     bodyArea?.setText(prefill.text);
     setComposeField(field);
@@ -129,18 +146,28 @@ export function createAppState() {
   async function openCompose() {
     if (composeOpen()) return;
     setReplyContext(null);
-    let prefill = { to: "", subject: "", text: "" };
+    let prefill: { to: string; cc?: string; bcc?: string; subject: string; text: string } = {
+      to: "",
+      subject: "",
+      text: "",
+    };
     try {
       const draft = await fetchCurrentDraft();
-      if (draft) prefill = { to: draft.to, subject: draft.subject, text: draft.text };
+      if (draft) prefill = {
+        to: draft.to,
+        ...(draft.cc ? { cc: draft.cc } : {}),
+        ...(draft.bcc ? { bcc: draft.bcc } : {}),
+        subject: draft.subject,
+        text: draft.text,
+      };
     } catch {
       // Daemon unreachable or corrupt draft — start empty.
     }
     mountComposePrefill(prefill, "to");
     setComposeStatus(
       prefill.to || prefill.subject || prefill.text
-        ? "draft restored · tab field · ctrl+s send · esc close"
-        : "tab field · ctrl+s send · esc close",
+        ? "draft restored · tab field · alt+c cc · alt+b bcc · ctrl+s send"
+        : "tab field · alt+c cc · alt+b bcc · ctrl+s send",
     );
     dialog.open({
       id: "compose",
@@ -200,15 +227,23 @@ export function createAppState() {
     if (!composeOpen()) return;
     if (composeSending()) return;
     const to = composeTo();
+    const cc = composeCc();
+    const bcc = composeBcc();
     const subject = composeSubject();
     const text = composeBody();
-    const key = `${to}\0${subject}\0${text}`;
+    const key = `${to}\0${cc}\0${bcc}\0${subject}\0${text}`;
     if (key === lastSavedKey) return;
     if (draftSaveTimer) clearTimeout(draftSaveTimer);
     draftSaveTimer = setTimeout(() => {
       lastSavedKey = key;
-      if (to.trim() || subject.trim() || text.trim()) {
-        void saveCurrentDraft({ to, subject, text }).catch(() => {});
+      if (to.trim() || cc.trim() || bcc.trim() || subject.trim() || text.trim()) {
+        void saveCurrentDraft({
+          to,
+          ...(cc.trim() ? { cc } : {}),
+          ...(bcc.trim() ? { bcc } : {}),
+          subject,
+          text,
+        }).catch(() => {});
       } else {
         void deleteCurrentDraft().catch(() => {});
       }
@@ -220,15 +255,45 @@ export function createAppState() {
   });
 
   function nextField(cur: ComposeField, reverse = false): ComposeField {
-    const order: ComposeField[] = ["to", "subject", "body"];
+    const order: ComposeField[] = ["to"];
+    if (composeShowCc()) order.push("cc");
+    if (composeShowBcc()) order.push("bcc");
+    order.push("subject", "body");
     const i = order.indexOf(cur);
+    if (i < 0) return "to";
     const next = reverse ? (i + order.length - 1) % order.length : (i + 1) % order.length;
     return order[next]!;
+  }
+
+  function toggleComposeCc() {
+    const next = !composeShowCc();
+    setComposeShowCc(next);
+    if (!next) {
+      setComposeCc("");
+      ccInput?.setText("");
+      if (composeField() === "cc") setComposeField("to");
+    } else {
+      setComposeField("cc");
+    }
+  }
+
+  function toggleComposeBcc() {
+    const next = !composeShowBcc();
+    setComposeShowBcc(next);
+    if (!next) {
+      setComposeBcc("");
+      bccInput?.setText("");
+      if (composeField() === "bcc") setComposeField("to");
+    } else {
+      setComposeField("bcc");
+    }
   }
 
   async function doSend() {
     if (composeSending()) return;
     const to = composeTo().trim();
+    const cc = composeCc().trim();
+    const bcc = composeBcc().trim();
     const subject = composeSubject().trim();
     const text = composeBody();
     if (!to) { setComposeStatus("error: recipient required"); setComposeField("to"); return; }
@@ -242,6 +307,8 @@ export function createAppState() {
       const reply = replyContext();
       const res = await sendDraft({
         to,
+        ...(cc ? { cc } : {}),
+        ...(bcc ? { bcc } : {}),
         subject,
         text,
         ...(reply ? { inReplyTo: reply.inReplyTo, references: reply.references } : {}),
@@ -250,8 +317,12 @@ export function createAppState() {
       lastSavedKey = "";
       await deleteCurrentDraft().catch(() => {});
       setComposeTo("");
+      setComposeCc("");
+      setComposeBcc("");
       setComposeSubject("");
       setComposeBody("");
+      setComposeShowCc(false);
+      setComposeShowBcc(false);
       setReplyContext(null);
       closeCompose();
     } catch (err) {
@@ -645,6 +716,8 @@ export function createAppState() {
     composeSending,
     showComposeSpinner,
     composeStatus,
+    composeShowCc,
+    composeShowBcc,
     searchOpen,
     searchQuery,
     searchHits,
@@ -672,6 +745,8 @@ export function createAppState() {
     openReply,
     closeCompose,
     doSend,
+    toggleComposeCc,
+    toggleComposeBcc,
     replyContext,
     nextField,
     openSearch,
@@ -691,6 +766,8 @@ export function createAppState() {
 
     // compose field writers (native input callbacks)
     writeComposeTo: (v: string) => setComposeTo(v),
+    writeComposeCc: (v: string) => setComposeCc(v),
+    writeComposeBcc: (v: string) => setComposeBcc(v),
     writeComposeSubject: (v: string) => setComposeSubject(v),
     syncComposeBodyFromArea: () => setComposeBody(bodyArea?.plainText ?? ""),
 
@@ -698,6 +775,16 @@ export function createAppState() {
     mountToInput: (r: InputRenderable) => {
       toInput = r;
       const v = composeTo();
+      if (v) r.setText(v);
+    },
+    mountCcInput: (r: InputRenderable) => {
+      ccInput = r;
+      const v = composeCc();
+      if (v) r.setText(v);
+    },
+    mountBccInput: (r: InputRenderable) => {
+      bccInput = r;
+      const v = composeBcc();
       if (v) r.setText(v);
     },
     mountSubjectInput: (r: InputRenderable) => {

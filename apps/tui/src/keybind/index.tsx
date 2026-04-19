@@ -33,6 +33,8 @@ export const DEFAULT_KEYBINDS = {
   "compose.send": "ctrl+s,ctrl+return",
   "compose.nextField": "tab",
   "compose.prevField": "shift+tab",
+  "compose.toggleCc": "alt+c",
+  "compose.toggleBcc": "alt+b",
   "search.next": "down,ctrl+j",
   "search.prev": "up,ctrl+k",
 } as const;

@@ -39,6 +39,16 @@ function Layout() {
         void s.doSend();
         return;
       }
+      if (kb.match("compose.toggleCc", e)) {
+        e.preventDefault();
+        s.toggleComposeCc();
+        return;
+      }
+      if (kb.match("compose.toggleBcc", e)) {
+        e.preventDefault();
+        s.toggleComposeBcc();
+        return;
+      }
       if (kb.match("compose.prevField", e)) {
         e.preventDefault();
         s.setComposeField((f) => s.nextField(f, true));

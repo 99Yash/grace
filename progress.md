@@ -4,6 +4,14 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 ## Timeline
 
+### 2026-04-19 (latest) — M8 Cc / Bcc
+
+- **Hidden by default, toggled with `alt+c` / `alt+b`.** Gmail and Superhuman both hide Cc/Bcc until requested, and the skeleton stays quieter that way — the compose overlay is 3 rows + body for the common case and grows only when needed. `ctrl+c` was the obvious pick but it's `app.quit`; `ctrl+b` is the leader chord. `alt+c` / `alt+b` are free and don't blur focus mid-toggle.
+- **Tab cycles the visible fields only.** `nextField` builds its order dynamically from `composeShowCc()` / `composeShowBcc()` — toggling Cc on inserts it between To and Subject; turning it back off drops it and, if focus was on that row, pops back to To. Prevents the "I pressed tab and landed on an invisible field" confusion.
+- **Validation is per-role.** `parseRecipients(body.cc ?? "")` / same for bcc; invalid addresses short-circuit with `invalid Cc: …` / `invalid Bcc: …` so the user knows exactly which row to fix rather than a generic "invalid recipient". Empty Cc/Bcc strings are fine (spreads skip them).
+- **Draft persistence.** `DraftRecord` now carries optional `cc` / `bcc` strings; the JSONL writer skips them when empty to keep old drafts forward-compatible. Saved + restored on `c` reopen; cleared on successful send.
+- **Wire.** `sendMessage` takes `cc?: string[]` / `bcc?: string[]` and forwards to nodemailer — Bcc recipients get the mail with no `Cc:` / `Bcc:` headers in the envelope (nodemailer handles that correctly). Inline hint on the To row (`alt+c cc · alt+b bcc`) advertises the toggle so a first-time user can find it without opening `?`.
+
 ### 2026-04-19 (later still) — M6 label toggle
 
 - **`l` opens a label picker.** New `apps/tui/src/ui/label-dialog.tsx` reuses `DialogSelect` to show `orderedFolders()` minus INBOX and the special-use folders that are either represented elsewhere in the UI (Starred = `s`, Trash = `#`, etc.) or not useful as labels (Drafts/Sent/Junk/All). Currently-applied labels group under "Applied" with `✓ applied · enter removes`; unapplied ones sit under "Labels" with `enter applies`. Enter toggles.

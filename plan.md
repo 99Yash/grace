@@ -15,7 +15,7 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M5c | Two-phase search (local + remote) | ✅ done | SQLite LIKE + Gmail `X-GM-RAW` stream-merge, `/` overlay (manual keystroke handling, no dropped first char), opportunistic import on remote-only open |
 | M6 | Mutations (archive / read / star / trash / label) | ✅ done | optimistic UI + IMAP via `applyMutation`; `l` toggles Gmail labels via X-GM-LABELS STORE |
 | M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; label pills in row; per-folder IDLE deferred |
-| M8 | Compose + SMTP send | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill with threading; Cc/Bcc + attachments deferred |
+| M8 | Compose + SMTP send | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill with threading; Cc/Bcc fields (alt+c / alt+b); attachments deferred |
 | M9 | Triage mode | ⬜ | fullscreen one-at-a-time, space-bar through inbox |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
 | M11 | Claude features | ⬜ | summarize, draft, NL-select (`. "urgent from stripe"`) |
@@ -84,8 +84,9 @@ Landed: `c` opens a full-screen compose overlay (sidebar stays visible). Fields:
 - **M8-02 ✅** `POST /api/send` — validates body, refreshes access token via `@grace/auth`, calls `sendMessage`, publishes `mail.sent`. 400 on empty/invalid fields; 502 on SMTP failure (message included in error).
 - **M8-03 ✅** TUI compose overlay — manual keystroke handling per field (same pattern as search overlay, avoids opentui `<input>` focus-race). `ComposeOverlay` component renders focused field with inline cursor `▌`; Body is a scrollbox so long mail fits. Status line shows transient state ("sending…", error, or the keybind hint). Bottom help bar flips to the compose hint.
 - **M8-04 ✅** Reply pre-fill — `shift+r` from the reader opens compose pre-filled with `To` = original sender, `Subject` = `Re: …` (dedup-safe), and a quoted body (`On <date>, <who> wrote:` + `> `-prefixed lines). Body route re-reads the cached `.eml` header block (first 32 KB) to extract `Message-ID` / `In-Reply-To` / `References`; fresh fetches get them from mailparser. Threading headers ride through `POST /api/send` into nodemailer's `inReplyTo` / `references` so Gmail stitches the reply into the original thread.
+- **M8-05 ✅** Cc / Bcc fields — `alt+c` / `alt+b` in compose reveal Cc / Bcc rows (hidden by default to keep the skeleton quiet). `parseRecipients` runs on each before send; any invalid address 400s with a targeted `invalid Cc:` / `invalid Bcc:` error. Draft persistence (`/api/drafts/current`) now carries optional `cc` / `bcc` strings so toggled-on rows survive a close/reopen. `sendMessage` forwards them as nodemailer `cc` / `bcc` arrays — Bcc recipients get the mail without `Cc:` / `Bcc:` headers leaking in the visible envelope, as expected.
 - **Deferred** Reply context survives compose close — closing mid-reply keeps the text in the draft file but drops the threading headers (next open becomes a plain compose). Acceptable for first pass; fix when draft records carry reply metadata.
-- **Deferred** Cc/Bcc fields; attachments; HTML bodies; sending progress via SSE rather than awaited POST.
+- **Deferred** Attachments; HTML bodies; sending progress via SSE rather than awaited POST.
 
 ## M9 — Triage mode
 

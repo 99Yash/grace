@@ -43,6 +43,8 @@ const LABELS: Record<string, string> = {
   "compose.send": "Send",
   "compose.nextField": "Next field",
   "compose.prevField": "Previous field",
+  "compose.toggleCc": "Toggle Cc field",
+  "compose.toggleBcc": "Toggle Bcc field",
   "search.next": "Next result",
   "search.prev": "Previous result",
 };
