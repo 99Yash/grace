@@ -4,7 +4,15 @@ Running log of what's shipped, what's working, and what's broken. See `plan.md` 
 
 ## Timeline
 
-### 2026-04-19 (latest) — M12 `grace doctor` CLI
+### 2026-04-19 (latest) — M12 `grace oauth logout` CLI
+
+- **Why.** `doctor` shipped the "is my state OK?" side of auth lifecycle; logout is the "get me out of here" side. Matters for fresh-install QA (wipe + resign to test the login path), for the weekly Testing-mode refresh-token expiry cycle where the stale token ends up fighting the new one, and as a prerequisite for the multi-account switcher that's queued post-M9. Cheaper to land now than remember why we need it later.
+- **`apps/server/src/cli/oauth-logout.ts`.** ~25 lines. Optional positional arg (`bun run oauth:logout user@example.com`); defaults to the active account. Paths: no active + no arg → "nothing to do" (exit 0, not a failure — a fresh install is a legitimate "logged out" state); target has tokens → `deleteTokens` + `clearActiveAccount` if appropriate; target has no stored tokens but the stale active pointer names it → sweep the pointer. Prints what it did line-by-line so the user doesn't have to re-run `doctor` to confirm.
+- **Why leave `~/.grace/` alone.** Re-signing as the same account should be a second-long warm-cache experience, not a thousand-message rebootstrap. Cross-account contamination isn't a real risk because DB rows already key on account implicitly (the active-account pointer changes; data stays). Printed hint points at the directory for users who *do* want a full wipe — explicit action, not a silent side effect of logout.
+- **Script wired.** `bun run oauth:logout` alongside `oauth:login` and `doctor` in the root `package.json`. Consistent naming makes discovery obvious — anyone who found `oauth:login` will find this.
+- **Verified.** `bun run oauth:logout nonexistent@example.com` prints `No keychain entry for …` and exits cleanly without touching the active session. Types pass. Real-account path not exercised (would log the dev out of their own session) — the branches are small enough that the no-account smoke plus the type checker is sufficient confidence.
+
+### 2026-04-19 — M12 `grace doctor` CLI
 
 - **Why.** Fresh-install pain and "is my local dev state actually OK?" debugging both pointed at the same hole — there was no single command to see env / keychain / db / imap health. The punch list called this out as one of the remaining M12 items; it's also the natural follow-on to idle-reconnect (that work changed the boot path, and doctor now exercises it end-to-end).
 - **`apps/server/src/cli/doctor.ts`.** Sectioned checklist with three severities — `✓` pass, `⚠` warn (degraded but usable), `✗` fail (blocking). Sections: env, keychain, database, capabilities, daemon, imap. Exit code is 1 on any fail, 0 otherwise; warnings don't block exit because "no active account" is a legitimate fresh-install state, not a broken one.

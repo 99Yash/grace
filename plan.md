@@ -19,7 +19,7 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M9 | Triage mode | ✅ done | fullscreen `shift+t`; space archive+next, a archive, r reply, j/k nav, m/s/#/e mutate, esc exit |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
 | M11 | Claude features | ⬜ | summarize, draft, NL-select (`. "urgent from stripe"`) |
-| M12 | Network resilience + polish | 🟡 partial | IDLE reconnect-with-backoff via supervisor shipped; `grace doctor` CLI shipped; oauth logout / docs deferred |
+| M12 | Network resilience + polish | 🟡 partial | IDLE reconnect-with-backoff via supervisor shipped; `grace doctor` CLI shipped; `grace oauth logout` shipped; docs / network detection deferred |
 
 ## M5 — Message reader (done)
 
@@ -122,9 +122,9 @@ Landed: `packages/mail/idle-supervisor.ts` owns the IMAP client + IDLE worker li
 - **M12-02 ✅** `bus.ts` gains `idle.status` event (`state, folder, attempt, delayMs?, reason?`). Server translates supervisor states into this event shape (idle → connecting).
 - **M12-03 ✅** Server boot calls `startIdleSupervisor` instead of manually creating a client + IDLE worker. Shutdown awaits `supervisor.stop()`.
 - **M12-04 ✅** `bun run doctor` — `apps/server/src/cli/doctor.ts` prints sectioned status: env (`.env` present + `GOOGLE_OAUTH_*` + `ANTHROPIC_API_KEY`), keychain (active account + refresh/access token + scope), database (path, size, row counts), capabilities (w3m), daemon (`/api/health` probe), imap (live token refresh + handshake + mailbox list + logout). Exits non-zero on any fail; non-zero warnings (e.g. `ANTHROPIC_API_KEY` absent, w3m missing, daemon not running) flagged but non-fatal. Zod env is bypassed so missing OAuth vars don't crash the tool — they're reported as checks instead.
+- **M12-05 ✅** `bun run oauth:logout [email]` — `apps/server/src/cli/oauth-logout.ts` clears keychain entries. Defaults to the active account; accepts an optional positional email to target a specific account (forward-compat with multi-account). Deletes the tokens entry, clears the active-account pointer when logging out the active account, and no-ops cleanly when the target has no stored tokens (still sweeps a stale active-account pointer if it matches). Leaves the local `~/.grace/` cache alone — printed hint tells the user they can wipe it manually if they want a clean slate.
 - **Deferred** TUI banner reflecting `idle.status` (reconnecting + countdown).
 - **Deferred** Network online/offline detection (macOS `SCNetworkReachability` or a periodic reachability probe).
-- **Deferred** `grace oauth logout` — clears keychain entries.
 - **Deferred** README + SETUP.md for a fresh install.
 
 ## Cross-cutting concerns
