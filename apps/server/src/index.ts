@@ -4,7 +4,9 @@ import {
   bus,
   ensureFolderIdle,
   getCapabilities,
+  startNetworkMonitorSingleton,
   stopFolderManager,
+  stopNetworkMonitorSingleton,
   watchedFolders,
 } from "@grace/api";
 import { loadActiveAccount } from "@grace/auth";
@@ -101,6 +103,7 @@ const server = new Elysia()
   });
 
 ensureInboxIdle();
+startNetworkMonitorSingleton();
 
 bus.subscribe((e) => {
   if (e.type === "auth.signed-in" && watchedFolders().length === 0) {
@@ -111,6 +114,7 @@ bus.subscribe((e) => {
 async function shutdown(signal: string) {
   console.log(`\n${signal} received, shutting down...`);
   backfillAbort.abort();
+  stopNetworkMonitorSingleton();
   await stopFolderManager();
   await server.stop();
   process.exit(0);

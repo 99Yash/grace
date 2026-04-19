@@ -34,6 +34,10 @@ export interface IdleSupervisorOpts {
 export interface IdleSupervisor {
   stop: () => Promise<void>;
   getStatus: () => IdleSupervisorStatus;
+  /** Short-circuit any pending backoff and attempt to reconnect now.
+   * No-op if currently connecting or watching. Returns true if the
+   * pending wait was cancelled and a fresh attempt was kicked. */
+  kick: (reason?: string) => boolean;
 }
 
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 60_000];
@@ -194,5 +198,16 @@ export function startIdleSupervisor(opts: IdleSupervisorOpts): IdleSupervisor {
       });
     },
     getStatus: () => status,
+    kick(reason) {
+      if (stopped) return false;
+      if (!reconnectTimer) return false;
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      if (reason) {
+        console.log(`[idle:${opts.folderName}] kicked out of backoff — ${reason}`);
+      }
+      void connectLoop();
+      return true;
+    },
   };
 }

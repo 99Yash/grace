@@ -13,6 +13,11 @@ export type BusEvent =
       delayMs?: number;
       reason?: string;
     }
+  | {
+      type: "network.status";
+      state: "online" | "offline";
+      reason?: string;
+    }
   | { type: "heartbeat"; at: number };
 
 type Listener = (e: BusEvent) => void;

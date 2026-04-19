@@ -23,6 +23,13 @@ export {
   type EnsureResult,
 } from "./folder-manager.ts";
 export {
+  startNetworkMonitor,
+  type NetworkMonitor,
+  type NetworkMonitorOpts,
+  type NetworkState,
+  type NetworkStatus,
+} from "./network-monitor.ts";
+export {
   runBackfill,
   DEFAULT_BACKFILL_TARGET,
   DEFAULT_BACKFILL_BATCH,

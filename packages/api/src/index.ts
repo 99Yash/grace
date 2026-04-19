@@ -21,6 +21,11 @@ export {
   stopFolderManager,
   watchedFolders,
 } from "./folder-manager.ts";
+export {
+  startNetworkMonitorSingleton,
+  stopNetworkMonitorSingleton,
+  getNetworkStatus,
+} from "./network-monitor.ts";
 export type { DraftRecord } from "./routes/drafts.ts";
 export type { SearchHit } from "./routes/search.ts";
 

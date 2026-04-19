@@ -39,6 +39,9 @@ export interface FolderManager {
   list: () => string[];
   /** Is this folder being watched? */
   has: (folderName: string) => boolean;
+  /** Short-circuit backoff across all supervisors. Returns the number
+   * that were actually kicked (i.e. were in the reconnecting state). */
+  kickAll: (reason?: string) => number;
   stopAll: () => Promise<void>;
 }
 
@@ -94,6 +97,13 @@ export function startFolderManager(opts: FolderManagerOpts): FolderManager {
     },
     list: () => [...supervisors.keys()],
     has: (folderName) => supervisors.has(folderName),
+    kickAll(reason) {
+      let kicked = 0;
+      for (const s of supervisors.values()) {
+        if (s.kick(reason)) kicked++;
+      }
+      return kicked;
+    },
     async stopAll() {
       const entries = [...supervisors.values()];
       supervisors.clear();
