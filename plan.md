@@ -19,7 +19,7 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M9 | Triage mode | ✅ done | fullscreen `shift+t`; space archive+next, a archive, r reply, j/k nav, m/s/#/e mutate, esc exit |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
 | M11 | Claude features | ⬜ | summarize, draft, NL-select (`. "urgent from stripe"`) |
-| M12 | Network resilience + polish | 🟡 partial | IDLE reconnect-with-backoff via supervisor shipped; doctor / oauth logout / docs deferred |
+| M12 | Network resilience + polish | 🟡 partial | IDLE reconnect-with-backoff via supervisor shipped; `grace doctor` CLI shipped; oauth logout / docs deferred |
 
 ## M5 — Message reader (done)
 
@@ -121,9 +121,9 @@ Landed: `packages/mail/idle-supervisor.ts` owns the IMAP client + IDLE worker li
 - **M12-01 ✅** `startIdleSupervisor({ email, clientId, clientSecret, db, folderName, onNewMessage, onStatus, onError })` — minted per-account. Returns `{ stop(), getStatus() }`. Reconnect attempts are `attempt++` on each failure, reset to 0 on successful `watching`. Close handler is wired only after watching is established and guards on `currentClient === client` so superseded or during-shutdown closes no-op.
 - **M12-02 ✅** `bus.ts` gains `idle.status` event (`state, folder, attempt, delayMs?, reason?`). Server translates supervisor states into this event shape (idle → connecting).
 - **M12-03 ✅** Server boot calls `startIdleSupervisor` instead of manually creating a client + IDLE worker. Shutdown awaits `supervisor.stop()`.
+- **M12-04 ✅** `bun run doctor` — `apps/server/src/cli/doctor.ts` prints sectioned status: env (`.env` present + `GOOGLE_OAUTH_*` + `ANTHROPIC_API_KEY`), keychain (active account + refresh/access token + scope), database (path, size, row counts), capabilities (w3m), daemon (`/api/health` probe), imap (live token refresh + handshake + mailbox list + logout). Exits non-zero on any fail; non-zero warnings (e.g. `ANTHROPIC_API_KEY` absent, w3m missing, daemon not running) flagged but non-fatal. Zod env is bypassed so missing OAuth vars don't crash the tool — they're reported as checks instead.
 - **Deferred** TUI banner reflecting `idle.status` (reconnecting + countdown).
 - **Deferred** Network online/offline detection (macOS `SCNetworkReachability` or a periodic reachability probe).
-- **Deferred** `grace doctor` CLI — prints env/keychain/db/imap status.
 - **Deferred** `grace oauth logout` — clears keychain entries.
 - **Deferred** README + SETUP.md for a fresh install.
 

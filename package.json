@@ -26,6 +26,7 @@
     "dev:server": "turbo -F server dev",
     "dev:tui": "bun run --cwd apps/tui src/index.tsx",
     "oauth:login": "bun apps/server/src/cli/oauth-login.ts",
+    "doctor": "bun apps/server/src/cli/doctor.ts",
     "smoke:imap": "bun apps/server/src/cli/smoke-imap.ts",
     "smoke:bootstrap": "bun apps/server/src/cli/smoke-bootstrap.ts",
     "build": "turbo build",
