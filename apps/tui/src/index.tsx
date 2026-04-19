@@ -180,9 +180,13 @@ function Layout() {
                       >
                         <DialogSlot slot="list" fallback={<InboxList />} />
                       </box>
-                      <Show when={s.readerOpen() && s.currentMsg()}>
-                        <box width={1} flexShrink={0} backgroundColor={t.field} />
-                        <Reader />
+                      <Show when={s.readerOpen() && s.currentMsg()?.gmMsgid} keyed>
+                        {(_id: string) => (
+                          <>
+                            <box width={1} flexShrink={0} backgroundColor={t.field} />
+                            <Reader />
+                          </>
+                        )}
                       </Show>
                     </>
                   }
