@@ -5,6 +5,14 @@ export type BusEvent =
   | { type: "folder.sync.progress"; folder: string; done: number; target: number }
   | { type: "mail.sent"; to: string[]; subject: string; messageId: string }
   | { type: "auth.signed-in"; email: string }
+  | {
+      type: "idle.status";
+      state: "connecting" | "watching" | "reconnecting" | "stopped";
+      folder: string;
+      attempt: number;
+      delayMs?: number;
+      reason?: string;
+    }
   | { type: "heartbeat"; at: number };
 
 type Listener = (e: BusEvent) => void;

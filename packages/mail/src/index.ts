@@ -8,6 +8,13 @@ export {
 } from "./bootstrap.ts";
 export { startIdleWorker, type IdleWorkerOpts, type IdleWorker } from "./idle.ts";
 export {
+  startIdleSupervisor,
+  type IdleSupervisor,
+  type IdleSupervisorOpts,
+  type IdleSupervisorStatus,
+  type IdleSupervisorState,
+} from "./idle-supervisor.ts";
+export {
   runBackfill,
   DEFAULT_BACKFILL_TARGET,
   DEFAULT_BACKFILL_BATCH,

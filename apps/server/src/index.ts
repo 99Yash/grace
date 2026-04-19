@@ -1,13 +1,12 @@
 import { cors } from "@elysiajs/cors";
 import { app, bus, getCapabilities } from "@grace/api";
-import { getFreshAccessToken, loadActiveAccount } from "@grace/auth";
+import { loadActiveAccount } from "@grace/auth";
 import { openDb } from "@grace/db";
 import { env, requireGoogleOAuth } from "@grace/env/server";
 import {
-  createImapClient,
   runBackfill,
-  startIdleWorker,
-  type IdleWorker,
+  startIdleSupervisor,
+  type IdleSupervisor,
 } from "@grace/mail";
 import { Elysia } from "elysia";
 
@@ -53,35 +52,59 @@ if (await probeExistingDaemon()) {
 openDb(`${GRACE_DATA_DIR}/grace.db`);
 getCapabilities();
 
-let idleWorker: IdleWorker | null = null;
-let idleStarting = false;
+let idleSupervisor: IdleSupervisor | null = null;
+let backfillStarted = false;
 const backfillAbort = new AbortController();
 
 async function startIdleIfPossible(): Promise<void> {
-  if (idleWorker || idleStarting) return;
+  if (idleSupervisor) return;
   const email = loadActiveAccount();
   if (!email) {
     console.log("[idle] skipped — no active account. sign in via the TUI.");
     return;
   }
-  idleStarting = true;
-  try {
-    const { clientId, clientSecret } = requireGoogleOAuth();
-    const accessToken = await getFreshAccessToken({ email, clientId, clientSecret });
-    const client = createImapClient({ email, accessToken, debug: process.env.GRACE_IMAP_DEBUG === "1" });
-    await client.connect();
-    const { db } = openDb(`${GRACE_DATA_DIR}/grace.db`);
-    idleWorker = await startIdleWorker({
-      client,
-      db,
-      folderName: "INBOX",
-      onNewMessage: ({ gmMsgid, subject }) => {
-        console.log(`[idle] new message: ${subject ?? "(no subject)"}`);
-        bus.publish({ type: "mail.received", folder: "INBOX", gmMsgid, subject });
-      },
-    });
-    console.log(`[idle] watching INBOX for ${email}`);
+  const { clientId, clientSecret } = requireGoogleOAuth();
+  const { db } = openDb(`${GRACE_DATA_DIR}/grace.db`);
 
+  idleSupervisor = startIdleSupervisor({
+    email,
+    clientId,
+    clientSecret,
+    db,
+    folderName: "INBOX",
+    debug: process.env.GRACE_IMAP_DEBUG === "1",
+    onNewMessage: ({ gmMsgid, subject }) => {
+      console.log(`[idle] new message: ${subject ?? "(no subject)"}`);
+      bus.publish({ type: "mail.received", folder: "INBOX", gmMsgid, subject });
+    },
+    onStatus: (s) => {
+      const state = s.state === "idle" ? "connecting" : s.state;
+      bus.publish({
+        type: "idle.status",
+        state,
+        folder: s.folder,
+        attempt: s.attempt,
+        ...(s.delayMs !== undefined ? { delayMs: s.delayMs } : {}),
+        ...(s.reason !== undefined ? { reason: s.reason } : {}),
+      });
+      if (s.state === "watching") {
+        console.log(`[idle] watching ${s.folder} for ${email}`);
+      } else if (s.state === "reconnecting") {
+        console.log(
+          `[idle] reconnecting in ${Math.round((s.delayMs ?? 0) / 100) / 10}s · attempt ${s.attempt} · ${s.reason ?? ""}`,
+        );
+      }
+    },
+    onError: (err, ctx) => {
+      console.error(
+        `[idle] attempt ${ctx.attempt} failed:`,
+        formatImapError(err),
+      );
+    },
+  });
+
+  if (!backfillStarted) {
+    backfillStarted = true;
     void runBackfill({
       email,
       clientId,
@@ -95,10 +118,6 @@ async function startIdleIfPossible(): Promise<void> {
     }).catch((err) => {
       console.error("[backfill] failed:", err instanceof Error ? err.message : err);
     });
-  } catch (err) {
-    console.error("[idle] failed to start:", formatImapError(err));
-  } finally {
-    idleStarting = false;
   }
 }
 
@@ -132,15 +151,15 @@ const server = new Elysia()
 void startIdleIfPossible();
 
 bus.subscribe((e) => {
-  if (e.type === "auth.signed-in" && !idleWorker) void startIdleIfPossible();
+  if (e.type === "auth.signed-in" && !idleSupervisor) void startIdleIfPossible();
 });
 
 async function shutdown(signal: string) {
   console.log(`\n${signal} received, shutting down...`);
   backfillAbort.abort();
-  if (idleWorker) {
-    await idleWorker.stop();
-    idleWorker = null;
+  if (idleSupervisor) {
+    await idleSupervisor.stop();
+    idleSupervisor = null;
   }
   await server.stop();
   process.exit(0);

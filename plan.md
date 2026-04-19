@@ -19,7 +19,7 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 | M9 | Triage mode | ✅ done | fullscreen `shift+t`; space archive+next, a archive, r reply, j/k nav, m/s/#/e mutate, esc exit |
 | M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
 | M11 | Claude features | ⬜ | summarize, draft, NL-select (`. "urgent from stripe"`) |
-| M12 | Network resilience + polish | ⬜ | IDLE reconnect-with-backoff, error recovery, docs |
+| M12 | Network resilience + polish | 🟡 partial | IDLE reconnect-with-backoff via supervisor shipped; doctor / oauth logout / docs deferred |
 
 ## M5 — Message reader (done)
 
@@ -113,14 +113,18 @@ Landed: `shift+t` opens a fullscreen triage dialog (content-slot, so sidebar sta
 - `.` → NL prompt → Claude translates to `X-GM-RAW` query → select matching messages for bulk action.
 - Requires `ANTHROPIC_API_KEY` in `.env`.
 
-## M12 — Resilience + polish
+## M12 — Resilience + polish (partial)
 
-- IDLE reconnect with exponential backoff on `close` event.
-- Network drop recovery (detect, reconnect on `online`).
-- Daemon health check route; TUI shows a warning banner when degraded.
-- `grace doctor` CLI — prints env/keychain/db/imap status.
-- `grace oauth logout` — clears keychain entries.
-- README + SETUP.md for a fresh install.
+Landed: `packages/mail/idle-supervisor.ts` owns the IMAP client + IDLE worker lifecycle. On `close` (socket drop) or on connect/auth failure it reschedules with exponential backoff (1s → 2s → 4s → 8s → 16s → 30s → 60s cap). Each attempt refreshes the OAuth access token so long outages that cross token TTL recover cleanly. Status transitions (`connecting` / `watching` / `reconnecting` / `stopped`) fan out as `idle.status` bus events so clients can reflect state. Backfill is kicked once per server lifetime — not rerun on every reconnect.
+
+- **M12-01 ✅** `startIdleSupervisor({ email, clientId, clientSecret, db, folderName, onNewMessage, onStatus, onError })` — minted per-account. Returns `{ stop(), getStatus() }`. Reconnect attempts are `attempt++` on each failure, reset to 0 on successful `watching`. Close handler is wired only after watching is established and guards on `currentClient === client` so superseded or during-shutdown closes no-op.
+- **M12-02 ✅** `bus.ts` gains `idle.status` event (`state, folder, attempt, delayMs?, reason?`). Server translates supervisor states into this event shape (idle → connecting).
+- **M12-03 ✅** Server boot calls `startIdleSupervisor` instead of manually creating a client + IDLE worker. Shutdown awaits `supervisor.stop()`.
+- **Deferred** TUI banner reflecting `idle.status` (reconnecting + countdown).
+- **Deferred** Network online/offline detection (macOS `SCNetworkReachability` or a periodic reachability probe).
+- **Deferred** `grace doctor` CLI — prints env/keychain/db/imap status.
+- **Deferred** `grace oauth logout` — clears keychain entries.
+- **Deferred** README + SETUP.md for a fresh install.
 
 ## Cross-cutting concerns
 
