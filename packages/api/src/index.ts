@@ -15,6 +15,12 @@ import { sendRoutes } from "./routes/send.ts";
 
 export { bus, type BusEvent } from "./bus.ts";
 export { getCapabilities, type Capabilities } from "./capabilities.ts";
+export {
+  getFolderManager,
+  ensureFolderIdle,
+  stopFolderManager,
+  watchedFolders,
+} from "./folder-manager.ts";
 export type { DraftRecord } from "./routes/drafts.ts";
 export type { SearchHit } from "./routes/search.ts";
 

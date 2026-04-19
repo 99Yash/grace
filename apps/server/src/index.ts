@@ -1,13 +1,16 @@
 import { cors } from "@elysiajs/cors";
-import { app, bus, getCapabilities } from "@grace/api";
+import {
+  app,
+  bus,
+  ensureFolderIdle,
+  getCapabilities,
+  stopFolderManager,
+  watchedFolders,
+} from "@grace/api";
 import { loadActiveAccount } from "@grace/auth";
 import { openDb } from "@grace/db";
 import { env, requireGoogleOAuth } from "@grace/env/server";
-import {
-  runBackfill,
-  startIdleSupervisor,
-  type IdleSupervisor,
-} from "@grace/mail";
+import { runBackfill } from "@grace/mail";
 import { Elysia } from "elysia";
 
 const { GRACE_HOST, GRACE_PORT, GRACE_DATA_DIR } = env();
@@ -52,93 +55,42 @@ if (await probeExistingDaemon()) {
 openDb(`${GRACE_DATA_DIR}/grace.db`);
 getCapabilities();
 
-let idleSupervisor: IdleSupervisor | null = null;
-let backfillStarted = false;
+const backfillStarted = new Set<string>();
 const backfillAbort = new AbortController();
 
-async function startIdleIfPossible(): Promise<void> {
-  if (idleSupervisor) return;
+function kickBackfill(folderName: string): void {
+  if (backfillStarted.has(folderName)) return;
   const email = loadActiveAccount();
-  if (!email) {
-    console.log("[idle] skipped — no active account. sign in via the TUI.");
-    return;
-  }
+  if (!email) return;
   const { clientId, clientSecret } = requireGoogleOAuth();
   const { db } = openDb(`${GRACE_DATA_DIR}/grace.db`);
-
-  idleSupervisor = startIdleSupervisor({
+  backfillStarted.add(folderName);
+  void runBackfill({
     email,
     clientId,
     clientSecret,
     db,
-    folderName: "INBOX",
-    debug: process.env.GRACE_IMAP_DEBUG === "1",
-    onNewMessage: ({ gmMsgid, subject }) => {
-      console.log(`[idle] new message: ${subject ?? "(no subject)"}`);
-      bus.publish({ type: "mail.received", folder: "INBOX", gmMsgid, subject });
+    folderName,
+    signal: backfillAbort.signal,
+    onProgress: (done, target) => {
+      bus.publish({ type: "folder.sync.progress", folder: folderName, done, target });
     },
-    onStatus: (s) => {
-      const state = s.state === "idle" ? "connecting" : s.state;
-      bus.publish({
-        type: "idle.status",
-        state,
-        folder: s.folder,
-        attempt: s.attempt,
-        ...(s.delayMs !== undefined ? { delayMs: s.delayMs } : {}),
-        ...(s.reason !== undefined ? { reason: s.reason } : {}),
-      });
-      if (s.state === "watching") {
-        console.log(`[idle] watching ${s.folder} for ${email}`);
-      } else if (s.state === "reconnecting") {
-        console.log(
-          `[idle] reconnecting in ${Math.round((s.delayMs ?? 0) / 100) / 10}s · attempt ${s.attempt} · ${s.reason ?? ""}`,
-        );
-      }
-    },
-    onError: (err, ctx) => {
-      console.error(
-        `[idle] attempt ${ctx.attempt} failed:`,
-        formatImapError(err),
-      );
-    },
+  }).catch((err) => {
+    backfillStarted.delete(folderName);
+    console.error(
+      `[backfill:${folderName}] failed:`,
+      err instanceof Error ? err.message : err,
+    );
   });
-
-  if (!backfillStarted) {
-    backfillStarted = true;
-    void runBackfill({
-      email,
-      clientId,
-      clientSecret,
-      db,
-      folderName: "INBOX",
-      signal: backfillAbort.signal,
-      onProgress: (done, target) => {
-        bus.publish({ type: "folder.sync.progress", folder: "INBOX", done, target });
-      },
-    }).catch((err) => {
-      console.error("[backfill] failed:", err instanceof Error ? err.message : err);
-    });
-  }
 }
 
-function formatImapError(err: unknown): string {
-  if (!(err instanceof Error)) return String(err);
-  const e = err as Error & {
-    responseText?: string;
-    serverResponseCode?: string;
-    authenticationFailed?: boolean;
-  };
-  const parts: string[] = [e.message];
-  if (e.responseText) parts.push(`response="${e.responseText}"`);
-  if (e.serverResponseCode) parts.push(`code=${e.serverResponseCode}`);
-  if (e.authenticationFailed) parts.push("auth-failed");
-  if (
-    e.responseText &&
-    /too many simultaneous connections/i.test(e.responseText)
-  ) {
-    parts.push("(Gmail 15-conn cap — wait ~60s and restart, or kill stale bun processes)");
+function ensureInboxIdle(): void {
+  const result = ensureFolderIdle("INBOX");
+  if (result === null) {
+    console.log("[idle] skipped — no active account. sign in via the TUI.");
+    return;
   }
-  return parts.join(" · ");
+  kickBackfill("INBOX");
 }
 
 const server = new Elysia()
@@ -148,19 +100,18 @@ const server = new Elysia()
     console.log(`grace daemon listening on http://${GRACE_HOST}:${GRACE_PORT}`);
   });
 
-void startIdleIfPossible();
+ensureInboxIdle();
 
 bus.subscribe((e) => {
-  if (e.type === "auth.signed-in" && !idleSupervisor) void startIdleIfPossible();
+  if (e.type === "auth.signed-in" && watchedFolders().length === 0) {
+    ensureInboxIdle();
+  }
 });
 
 async function shutdown(signal: string) {
   console.log(`\n${signal} received, shutting down...`);
   backfillAbort.abort();
-  if (idleSupervisor) {
-    await idleSupervisor.stop();
-    idleSupervisor = null;
-  }
+  await stopFolderManager();
   await server.stop();
   process.exit(0);
 }

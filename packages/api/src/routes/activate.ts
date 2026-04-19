@@ -6,6 +6,7 @@ import { requireGoogleOAuth } from "@grace/env/server";
 import { bootstrapFolder, createImapClient, runBackfill } from "@grace/mail";
 import { bus } from "../bus.ts";
 import { db } from "../db.ts";
+import { ensureFolderIdle } from "../folder-manager.ts";
 
 const active = new Map<string, Promise<ActivateResult>>();
 const backfilled = new Set<string>();
@@ -84,6 +85,9 @@ async function activateFolder(folderName: string): Promise<ActivateResult> {
   }
 
   const after = countFolder(folderName);
+
+  const idleResult = ensureFolderIdle(folderName);
+  if (idleResult) console.log(`[activate:${folderName}] ${idleResult}`);
 
   if (!backfilled.has(folderName)) {
     backfilled.add(folderName);

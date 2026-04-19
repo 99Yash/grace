@@ -15,6 +15,14 @@ export {
   type IdleSupervisorState,
 } from "./idle-supervisor.ts";
 export {
+  startFolderManager,
+  DEFAULT_MAX_CONCURRENT_IDLE,
+  type FolderManager,
+  type FolderManagerOpts,
+  type FolderManagerNewMessage,
+  type EnsureResult,
+} from "./folder-manager.ts";
+export {
   runBackfill,
   DEFAULT_BACKFILL_TARGET,
   DEFAULT_BACKFILL_BATCH,
