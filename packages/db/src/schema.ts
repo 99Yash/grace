@@ -13,7 +13,9 @@ export const messages = sqliteTable(
   {
     gmMsgid: text("gm_msgid").primaryKey(),
     gmThrid: text("gm_thrid"),
-    folderId: integer("folder_id").notNull().references(() => folders.id),
+    folderId: integer("folder_id")
+      .notNull()
+      .references(() => folders.id),
     uid: integer("uid").notNull(),
     subject: text("subject"),
     fromName: text("from_name"),

@@ -50,6 +50,7 @@ Two processes on the same machine. The TUI is a thin client; the daemon is the s
 ```
 
 **Why this split:**
+
 - Daemon keeps IMAP IDLE alive even when no TUI is open → opening the TUI is instant (SQLite read), never "syncing…".
 - Multi-window is free: any number of TUIs can SSE-subscribe to the same daemon.
 - OAuth tokens live in one place.
@@ -59,22 +60,23 @@ Two processes on the same machine. The TUI is a thin client; the daemon is the s
 
 ## Technical stack
 
-| Layer | Choice |
-|---|---|
-| UI | `@opentui/core` + `@opentui/solid` |
-| Reactivity | SolidJS (fine-grained, no reconciliation cost) |
-| Daemon framework | Elysia + Eden Treaty (end-to-end types, no codegen) |
-| Event bus | Effect `PubSub.unbounded` + SSE |
-| Local store | SQLite via Drizzle, `@rocicorp/zero-sqlite3` driver |
-| IMAP | `imapflow` (IDLE, CONDSTORE, OAuth2) |
-| SMTP | `nodemailer` (same OAuth2 credentials) |
-| Auth | Google OAuth2 (loopback redirect flow), tokens in macOS Keychain via `keytar` |
-| AI | `@anthropic-ai/sdk` |
-| HTML render | plain-text default · `w3m -dump` on `v` · browser eject on `V` |
-| Images | Kitty/Sixel graphics protocol where terminal supports it |
-| Workspace | Bun workspaces + catalog, Turbo, tsdown |
+| Layer            | Choice                                                                        |
+| ---------------- | ----------------------------------------------------------------------------- |
+| UI               | `@opentui/core` + `@opentui/solid`                                            |
+| Reactivity       | SolidJS (fine-grained, no reconciliation cost)                                |
+| Daemon framework | Elysia + Eden Treaty (end-to-end types, no codegen)                           |
+| Event bus        | Effect `PubSub.unbounded` + SSE                                               |
+| Local store      | SQLite via Drizzle, `@rocicorp/zero-sqlite3` driver                           |
+| IMAP             | `imapflow` (IDLE, CONDSTORE, OAuth2)                                          |
+| SMTP             | `nodemailer` (same OAuth2 credentials)                                        |
+| Auth             | Google OAuth2 (loopback redirect flow), tokens in macOS Keychain via `keytar` |
+| AI               | `@anthropic-ai/sdk`                                                           |
+| HTML render      | plain-text default · `w3m -dump` on `v` · browser eject on `V`                |
+| Images           | Kitty/Sixel graphics protocol where terminal supports it                      |
+| Workspace        | Bun workspaces + catalog, Turbo, tsdown                                       |
 
 **Reference implementations:**
+
 - `/Users/yash/Developer/self/orys` — Bun+Elysia+Turbo layout template.
 - `/Users/yash/Developer/oss/opencode` — daemon+TUI architecture, SSE bus pattern, command palette, Solid store sync pattern.
 
@@ -88,6 +90,7 @@ Two processes on the same machine. The TUI is a thin client; the daemon is the s
 ## v1 features (MVP)
 
 Table-stakes:
+
 - Three-pane layout: folders/labels · message list · reader.
 - Keyboard navigation (`j`/`k` list, `Enter` open, `g i` inbox, `g s` sent, etc.).
 - Optimistic mutations: `archive`, `mark read/unread`, `star`, `trash`, `move`.
@@ -97,6 +100,7 @@ Table-stakes:
 - HTML handling: plain-text default, `v` for `w3m -dump`, `V` for browser eject.
 
 Creative features locked in:
+
 - **Triage mode** — fullscreen, one email at a time, three primary actions. Space-bar through the inbox like Tinder. The killer feature for 200-unread days.
 - **Command palette** — `:` or `Cmd+K` opens fuzzy finder over actions + inbox + contacts simultaneously. Single registry for all commands; leader-key chord support.
 - **Claude triage**:

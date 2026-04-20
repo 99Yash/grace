@@ -33,7 +33,10 @@ let nextId = 1;
 
 function dismiss(id: number) {
   const t = timers.get(id);
-  if (t) { clearTimeout(t); timers.delete(id); }
+  if (t) {
+    clearTimeout(t);
+    timers.delete(id);
+  }
   setStore("entries", (list) => list.filter((e) => e.id !== id));
 }
 
@@ -70,10 +73,14 @@ export const toast = {
 
 function variantColor(t: ReturnType<typeof useTheme>, v: ToastVariant): string {
   switch (v) {
-    case "success": return t.success;
-    case "warning": return t.warning;
-    case "error": return t.error;
-    case "info": return t.primarySoft;
+    case "success":
+      return t.success;
+    case "warning":
+      return t.warning;
+    case "error":
+      return t.error;
+    case "info":
+      return t.primarySoft;
   }
 }
 
@@ -101,9 +108,13 @@ export function ToastHost() {
               <box width={1} backgroundColor={variantColor(t, entry.variant)} />
               <box flexDirection="column" paddingLeft={1} paddingRight={1}>
                 <Show when={entry.title}>
-                  <text attributes={1} fg={t.textBright}>{entry.title}</text>
+                  <text attributes={1} fg={t.textBright}>
+                    {entry.title}
+                  </text>
                 </Show>
-                <text fg={t.textBody} wrapMode="word">{entry.message}</text>
+                <text fg={t.textBody} wrapMode="word">
+                  {entry.message}
+                </text>
               </box>
             </box>
           )}

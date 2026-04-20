@@ -1,7 +1,6 @@
 {
   "name": "grace",
   "private": true,
-  "type": "module",
   "workspaces": {
     "packages": [
       "apps/*",
@@ -21,6 +20,7 @@
       "imapflow": "^1.0.0"
     }
   },
+  "type": "module",
   "scripts": {
     "dev": "bun run dev:server & bun run dev:tui",
     "dev:server": "turbo -F server dev",

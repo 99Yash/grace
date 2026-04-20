@@ -21,6 +21,9 @@ export interface Theme {
   primarySoft: string;
   primaryOnSelection: string;
 
+  accent: string;
+  accentSoft: string;
+
   success: string;
   warning: string;
   error: string;

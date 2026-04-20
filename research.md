@@ -111,6 +111,7 @@ Opencode stores API keys in `~/.local/share/opencode/auth.json` with `0o600`. Fo
 ## When to delete / revisit this file
 
 Delete sections when they go stale. Specifically:
+
 - opencode file paths drift fast — their repo is active (commit history is dense). Re-verify before quoting.
 - opentui's option+backspace gap may get fixed upstream — check before adding workarounds.
 - Replicache vs Zero: Zero will probably ship Node client support eventually. Revisit the "no Replicache" decision then.

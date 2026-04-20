@@ -82,10 +82,7 @@ function kickBackfill(folderName: string): void {
     .then(() => maybeSyncCategories(folderName))
     .catch((err) => {
       backfillStarted.delete(folderName);
-      console.error(
-        `[backfill:${folderName}] failed:`,
-        err instanceof Error ? err.message : err,
-      );
+      console.error(`[backfill:${folderName}] failed:`, err instanceof Error ? err.message : err);
     });
 }
 

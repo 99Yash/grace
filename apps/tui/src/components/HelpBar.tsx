@@ -24,11 +24,10 @@ export function HelpBar() {
             tab field · alt+c cc · alt+b bcc · alt+a attach · ctrl+s send · esc close
           </Match>
           <Match when={s.triageOpen()}>
-            space archive+next · a archive · r reply · j/k nav · m read · s star · # trash · esc exit
+            space archive+next · a archive · r reply · j/k nav · m read · s star · # trash · esc
+            exit
           </Match>
-          <Match when={s.sidebarFocused()}>
-            j/k nav · enter switch · tab/esc back to list
-          </Match>
+          <Match when={s.sidebarFocused()}>j/k nav · enter switch · tab/esc back to list</Match>
           <Match when={s.searchOpen() && !s.readerOpen()}>
             type to search · ↑↓ nav · enter open · esc cancel
           </Match>

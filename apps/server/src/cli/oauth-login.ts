@@ -9,7 +9,8 @@ const tokens = await runLoginFlow({
   clientId,
   clientSecret,
   onOpenUrl: async (url) => {
-    const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+    const cmd =
+      process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
     try {
       Bun.spawn([cmd, url], { stdout: "ignore", stderr: "ignore" });
     } catch {

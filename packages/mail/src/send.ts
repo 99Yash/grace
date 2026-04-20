@@ -60,9 +60,7 @@ export async function sendMessage(opts: SendMessageOpts): Promise<SendMessageRes
       subject,
       text,
       ...(inReplyTo ? { inReplyTo: bracketed(inReplyTo) } : {}),
-      ...(references && references.length > 0
-        ? { references: references.map(bracketed) }
-        : {}),
+      ...(references && references.length > 0 ? { references: references.map(bracketed) } : {}),
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
     });
     return {
@@ -83,7 +81,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Parse a comma-separated recipient list. Returns `{ valid, invalid }`. */
 export function parseRecipients(raw: string): { valid: string[]; invalid: string[] } {
-  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const valid: string[] = [];
   const invalid: string[] = [];
   for (const p of parts) {

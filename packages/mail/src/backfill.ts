@@ -61,11 +61,15 @@ export async function runBackfill(opts: BackfillOpts): Promise<{ done: number; t
 
       onProgress?.(done, effectiveTarget);
       if (done >= effectiveTarget) {
-        console.log(`[backfill] ${folderName} already at ${done}/${effectiveTarget} — nothing to do`);
+        console.log(
+          `[backfill] ${folderName} already at ${done}/${effectiveTarget} — nothing to do`,
+        );
         return { done, target: effectiveTarget };
       }
 
-      console.log(`[backfill] ${folderName} starting · local=${done} target=${effectiveTarget} mailbox=${mailboxTotal}`);
+      console.log(
+        `[backfill] ${folderName} starting · local=${done} target=${effectiveTarget} mailbox=${mailboxTotal}`,
+      );
 
       while (!aborted() && done < effectiveTarget) {
         const minUid = minLocalUid(db, folderId);
@@ -74,10 +78,7 @@ export async function runBackfill(opts: BackfillOpts): Promise<{ done: number; t
           break;
         }
 
-        const searchResult = await client.search(
-          { uid: `1:${minUid - 1}` },
-          { uid: true },
-        );
+        const searchResult = await client.search({ uid: `1:${minUid - 1}` }, { uid: true });
         const olderUids = searchResult || [];
         if (olderUids.length === 0) {
           console.log(`[backfill] mailbox exhausted below uid=${minUid}`);

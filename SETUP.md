@@ -77,6 +77,7 @@ bun run oauth:login
 ```
 
 This:
+
 1. Opens a loopback HTTP listener on a random localhost port.
 2. Opens your browser to Google's consent screen (PKCE + `state`).
 3. Receives the code, exchanges it for tokens, and stores them in the
@@ -102,6 +103,7 @@ installed). A real failure looks like a red `✗` on env, keychain, or
 imap. Doctor exits non-zero on any `✗`.
 
 Example sections doctor checks:
+
 - `env` — `.env` present, `GOOGLE_OAUTH_*` set,
   `ANTHROPIC_API_KEY` (warn if missing; required for M11 Claude
   features only).
@@ -127,16 +129,17 @@ header. After that, new mail pushes in under a second via IDLE.
 
 ## 8. Everyday commands
 
-| Command | What it does |
-|---|---|
-| `bun run dev:server` | Foreground daemon — owns IDLE + mutations |
-| `bun run dev:tui` | Foreground TUI — any number can attach |
-| `bun run doctor` | Sanity check — run first when something's off |
-| `bun run oauth:login` | Re-auth after the 7-day Testing-mode expiry |
-| `bun run oauth:logout` | Clear the active account's Keychain tokens |
-| `bun run oauth:logout user@example.com` | Clear a specific account (forward-compat) |
+| Command                                 | What it does                                  |
+| --------------------------------------- | --------------------------------------------- |
+| `bun run dev:server`                    | Foreground daemon — owns IDLE + mutations     |
+| `bun run dev:tui`                       | Foreground TUI — any number can attach        |
+| `bun run doctor`                        | Sanity check — run first when something's off |
+| `bun run oauth:login`                   | Re-auth after the 7-day Testing-mode expiry   |
+| `bun run oauth:logout`                  | Clear the active account's Keychain tokens    |
+| `bun run oauth:logout user@example.com` | Clear a specific account (forward-compat)     |
 
 Inside the TUI:
+
 - `?` — keybinds dialog (authoritative — don't memorize from this file)
 - `:` — command palette
 

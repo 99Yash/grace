@@ -10,7 +10,6 @@ Input & cursor (compose / search)
 4. P1 — Tab in body means "next field"; can't indent (:924-925). Fix with the registry above.
 5. ✅ P2 — No paste normalization (CRLF leaks in). Opencode normalizes in onPaste. (opentui's InputRenderable.handlePaste and TextareaRenderable.handlePaste strip ANSI; Input also strips newlines.)
 
-
 Loading & async states
 
 6. ✅ P0 — Compose send freezes UI with no visible state (:918-920). Add opencode's deferred-spinner pattern: 500ms before showing, 3s minimum hold
@@ -22,7 +21,6 @@ Loading & async states
 9. ✅ P1 — Body pane goes blank between messages (:786-797). Keep old body + dim it until new one loads.
 10. ✅ P2 — Spinner component missing entirely. Copy opencode's braille-frame spinner with animations_enabled kv flag (spinner.tsx). (Added `<Spinner>` with braille frames; no kv flag — always on.)
 
-
 Perf hotspots
 
 11. P0 — Mail list is not virtualized. ScrollBox renders every child. At >500 mails this stutters. Opentui ships primitives but no auto-virtualizer — we
@@ -31,8 +29,7 @@ Perf hotspots
 13. P1 — <For each={props.hits}> has no key; full redraw on each SSE tick (:399). Add stable key.
 14. P1 — Mutations fire per-keystroke with no debounce (:833-851). Rapid e e e = 3 POSTs. Use opencode's createDebouncedSignal (160ms).
 15. P2 — Not using requestLive()/dropLive() — we're likely triggering full renders per keystroke. Enter live mode during scroll/type, drop when idle.
-16. P2 — MessageRow color fns recompute every render (:142-170). Memoize.  
-
+16. P2 — MessageRow color fns recompute every render (:142-170). Memoize.
 
 Focus & keybindings
 
@@ -42,8 +39,7 @@ Focus & keybindings
     (context/keybind.tsx) that doubles as a help source.
 19. P1 — Shift+Tab in compose jumps to body, not reverse-cycle (:616-621).
 20. P2 — Two bindings for send (Ctrl+S, Ctrl+Enter); pick one.
-21. P2 — j/k don't work while reader is open (:952). Add reader-scoped list nav.  
-
+21. P2 — j/k don't work while reader is open (:952). Add reader-scoped list nav.
 
 Visual polish
 

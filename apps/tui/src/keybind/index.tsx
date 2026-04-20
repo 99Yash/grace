@@ -86,15 +86,24 @@ function createKeybind(overrides?: Record<string, string>): KeybindApi {
       return;
     }
     setStore("leader", false);
-    if (timeout) { clearTimeout(timeout); timeout = null; }
+    if (timeout) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
     if (focus && !focus.isDestroyed) focus.focus?.();
     focus = null;
   }
 
   const api: KeybindApi = {
-    get all() { return keybinds; },
-    get leader() { return store.leader; },
-    parse(evt) { return Keybind.fromParsedKey(evt, store.leader); },
+    get all() {
+      return keybinds;
+    },
+    get leader() {
+      return store.leader;
+    },
+    parse(evt) {
+      return Keybind.fromParsedKey(evt, store.leader);
+    },
     match(key, evt) {
       const list = keybinds[key] ?? Keybind.parse(key);
       if (!list.length) return false;
@@ -117,7 +126,9 @@ function createKeybind(overrides?: Record<string, string>): KeybindApi {
       return;
     }
     if (store.leader && evt.name) {
-      setImmediate(() => { if (store.leader) setLeader(false); });
+      setImmediate(() => {
+        if (store.leader) setLeader(false);
+      });
     }
   });
 

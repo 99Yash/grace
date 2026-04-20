@@ -57,18 +57,45 @@ export function parse(key: string): Info[] {
   return key.split(",").map((combo) => {
     const normalized = combo.replace(/<leader>/g, "leader+");
     const parts = normalized.toLowerCase().split("+");
-    const info: Info = { name: "", ctrl: false, meta: false, shift: false, super: false, leader: false };
+    const info: Info = {
+      name: "",
+      ctrl: false,
+      meta: false,
+      shift: false,
+      super: false,
+      leader: false,
+    };
     for (const part of parts) {
       switch (part) {
-        case "ctrl": info.ctrl = true; break;
-        case "alt": case "meta": case "option": info.meta = true; break;
-        case "super": info.super = true; break;
-        case "shift": info.shift = true; break;
-        case "leader": info.leader = true; break;
-        case "esc": info.name = "escape"; break;
-        case "enter": info.name = "return"; break;
-        case "spc": info.name = "space"; break;
-        default: info.name = part; break;
+        case "ctrl":
+          info.ctrl = true;
+          break;
+        case "alt":
+        case "meta":
+        case "option":
+          info.meta = true;
+          break;
+        case "super":
+          info.super = true;
+          break;
+        case "shift":
+          info.shift = true;
+          break;
+        case "leader":
+          info.leader = true;
+          break;
+        case "esc":
+          info.name = "escape";
+          break;
+        case "enter":
+          info.name = "return";
+          break;
+        case "spc":
+          info.name = "space";
+          break;
+        default:
+          info.name = part;
+          break;
       }
     }
     return info;

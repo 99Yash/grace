@@ -70,26 +70,63 @@ function Layout() {
 
     // Triage owns the whole screen; route its keys before list-mode handlers.
     if (s.triageOpen()) {
-      if (kb.match("triage.archiveNext", e)) { e.preventDefault(); s.triageArchiveAndNext(); return; }
-      if (kb.match("triage.reply", e)) { void s.openReply(); return; }
+      if (kb.match("triage.archiveNext", e)) {
+        e.preventDefault();
+        s.triageArchiveAndNext();
+        return;
+      }
+      if (kb.match("triage.reply", e)) {
+        void s.openReply();
+        return;
+      }
       if (kb.match("triage.archive", e)) {
         const m = s.currentMsg();
         if (m) void s.runMutation(m, "archive");
         return;
       }
-      if (kb.match("nav.down", e)) { s.triageNext(); return; }
-      if (kb.match("nav.up", e)) { s.triagePrev(); return; }
+      if (kb.match("nav.down", e)) {
+        s.triageNext();
+        return;
+      }
+      if (kb.match("nav.up", e)) {
+        s.triagePrev();
+        return;
+      }
       const m = s.currentMsg();
       if (m) {
-        if (kb.match("mail.toggleRead", e)) { void s.runMutation(m, "toggle-read"); return; }
-        if (kb.match("mail.toggleStar", e)) { void s.runMutation(m, "toggle-star"); return; }
-        if (kb.match("mail.archive", e)) { void s.runMutation(m, "archive"); return; }
-        if (kb.match("mail.trash", e)) { void s.runMutation(m, "trash"); return; }
+        if (kb.match("mail.toggleRead", e)) {
+          void s.runMutation(m, "toggle-read");
+          return;
+        }
+        if (kb.match("mail.toggleStar", e)) {
+          void s.runMutation(m, "toggle-star");
+          return;
+        }
+        if (kb.match("mail.archive", e)) {
+          void s.runMutation(m, "archive");
+          return;
+        }
+        if (kb.match("mail.trash", e)) {
+          void s.runMutation(m, "trash");
+          return;
+        }
       }
-      if (kb.match("reader.toggleQuotes", e)) { s.toggleQuotes(); return; }
-      if (kb.match("app.help", e)) { openHelp(); return; }
-      if (kb.match("app.palette", e)) { openPalette(); return; }
-      if (kb.match("app.themes", e)) { openThemes(); return; }
+      if (kb.match("reader.toggleQuotes", e)) {
+        s.toggleQuotes();
+        return;
+      }
+      if (kb.match("app.help", e)) {
+        openHelp();
+        return;
+      }
+      if (kb.match("app.palette", e)) {
+        openPalette();
+        return;
+      }
+      if (kb.match("app.themes", e)) {
+        openThemes();
+        return;
+      }
       return;
     }
 
@@ -105,7 +142,10 @@ function Layout() {
 
     if (s.sidebarFocused() && !s.readerOpen() && !s.searchOpen()) {
       const fs = s.orderedFolders();
-      if (kb.match("dialog.close", e)) { s.setSidebarFocused(false); return; }
+      if (kb.match("dialog.close", e)) {
+        s.setSidebarFocused(false);
+        return;
+      }
       if (kb.match("nav.down", e)) {
         s.setFolderSelected((v) => Math.min(Math.max(0, fs.length - 1), v + 1));
         return;
@@ -150,50 +190,114 @@ function Layout() {
       }
       const m = s.currentMsg();
       if (m) {
-        if (kb.match("mail.toggleRead", e)) { void s.runMutation(m, "toggle-read"); return; }
-        if (kb.match("mail.toggleStar", e)) { void s.runMutation(m, "toggle-star"); return; }
-        if (kb.match("mail.archive", e)) { void s.runMutation(m, "archive"); return; }
-        if (kb.match("mail.trash", e)) { void s.runMutation(m, "trash"); return; }
-        if (kb.match("mail.label", e)) { openLabelPicker(); return; }
+        if (kb.match("mail.toggleRead", e)) {
+          void s.runMutation(m, "toggle-read");
+          return;
+        }
+        if (kb.match("mail.toggleStar", e)) {
+          void s.runMutation(m, "toggle-star");
+          return;
+        }
+        if (kb.match("mail.archive", e)) {
+          void s.runMutation(m, "archive");
+          return;
+        }
+        if (kb.match("mail.trash", e)) {
+          void s.runMutation(m, "trash");
+          return;
+        }
+        if (kb.match("mail.label", e)) {
+          openLabelPicker();
+          return;
+        }
       }
-      if (kb.match("reader.reply", e)) { void s.openReply(); return; }
-      if (kb.match("reader.w3m", e)) { s.triggerW3m(); return; }
-      if (kb.match("reader.browser", e)) { s.openHtmlInBrowser(); return; }
-      if (kb.match("reader.textMode", e)) { s.setTextMode(); return; }
-      if (kb.match("reader.toggleQuotes", e)) { s.toggleQuotes(); return; }
+      if (kb.match("reader.reply", e)) {
+        void s.openReply();
+        return;
+      }
+      if (kb.match("reader.w3m", e)) {
+        s.triggerW3m();
+        return;
+      }
+      if (kb.match("reader.browser", e)) {
+        s.openHtmlInBrowser();
+        return;
+      }
+      if (kb.match("reader.textMode", e)) {
+        s.setTextMode();
+        return;
+      }
+      if (kb.match("reader.toggleQuotes", e)) {
+        s.toggleQuotes();
+        return;
+      }
       if (!e.ctrl && !e.meta && !e.shift && /^[1-9]$/.test(e.name ?? "")) {
         if (s.openReaderLink(Number(e.name) - 1)) return;
       }
     }
 
-    if (kb.match("app.help", e)) { openHelp(); return; }
-    if (kb.match("app.palette", e)) { openPalette(); return; }
-    if (kb.match("app.themes", e)) { openThemes(); return; }
-    if (kb.match("app.search", e) && !s.searchOpen()) { s.openSearch(); return; }
-    if (kb.match("app.compose", e)) { s.openCompose(); return; }
-    if (kb.match("app.refresh", e)) { void s.refetch(); return; }
+    if (kb.match("app.help", e)) {
+      openHelp();
+      return;
+    }
+    if (kb.match("app.palette", e)) {
+      openPalette();
+      return;
+    }
+    if (kb.match("app.themes", e)) {
+      openThemes();
+      return;
+    }
+    if (kb.match("app.search", e) && !s.searchOpen()) {
+      s.openSearch();
+      return;
+    }
+    if (kb.match("app.compose", e)) {
+      s.openCompose();
+      return;
+    }
+    if (kb.match("app.refresh", e)) {
+      void s.refetch();
+      return;
+    }
     if (!s.sidebarFocused() && !s.readerOpen()) {
-      if (kb.match("list.nextPage", e)) { s.nextPage(); return; }
-      if (kb.match("list.prevPage", e)) { s.prevPage(); return; }
+      if (kb.match("list.nextPage", e)) {
+        s.nextPage();
+        return;
+      }
+      if (kb.match("list.prevPage", e)) {
+        s.prevPage();
+        return;
+      }
     }
     if (
       s.activeFolder() === "INBOX" &&
       !s.sidebarFocused() &&
       !s.readerOpen() &&
-      !e.ctrl && !e.meta && !e.shift && !e.option
+      !e.ctrl &&
+      !e.meta &&
+      !e.shift &&
+      !e.option
     ) {
-      const tabs: ReadonlyArray<"primary" | "promotions" | "social" | "updates" | "forums" | "all"> =
-        ["primary", "promotions", "social", "updates", "forums", "all"];
+      const tabs: ReadonlyArray<
+        "primary" | "promotions" | "social" | "updates" | "forums" | "all"
+      > = ["primary", "promotions", "social", "updates", "forums", "all"];
       const n = e.name ?? "";
       if (/^[1-6]$/.test(n)) {
         const picked = tabs[Number(n) - 1];
-        if (picked) { s.setInboxCategory(picked); return; }
+        if (picked) {
+          s.setInboxCategory(picked);
+          return;
+        }
       }
       if (n === "right" || n === "left") {
-        const cur = tabs.indexOf(s.inboxCategory() as typeof tabs[number]);
+        const cur = tabs.indexOf(s.inboxCategory() as (typeof tabs)[number]);
         const delta = n === "right" ? 1 : -1;
         const next = tabs[(cur + delta + tabs.length) % tabs.length];
-        if (next) { s.setInboxCategory(next); return; }
+        if (next) {
+          s.setInboxCategory(next);
+          return;
+        }
       }
     }
     if (!total) return;
@@ -211,11 +315,26 @@ function Layout() {
     } else {
       const m = list[s.selected()];
       if (!m) return;
-      if (kb.match("mail.toggleRead", e)) { void s.runMutation(m, "toggle-read"); return; }
-      if (kb.match("mail.toggleStar", e)) { void s.runMutation(m, "toggle-star"); return; }
-      if (kb.match("mail.archive", e)) { void s.runMutation(m, "archive"); return; }
-      if (kb.match("mail.trash", e)) { void s.runMutation(m, "trash"); return; }
-      if (kb.match("mail.label", e)) { openLabelPicker(); return; }
+      if (kb.match("mail.toggleRead", e)) {
+        void s.runMutation(m, "toggle-read");
+        return;
+      }
+      if (kb.match("mail.toggleStar", e)) {
+        void s.runMutation(m, "toggle-star");
+        return;
+      }
+      if (kb.match("mail.archive", e)) {
+        void s.runMutation(m, "archive");
+        return;
+      }
+      if (kb.match("mail.trash", e)) {
+        void s.runMutation(m, "trash");
+        return;
+      }
+      if (kb.match("mail.label", e)) {
+        openLabelPicker();
+        return;
+      }
     }
   });
 
@@ -244,12 +363,24 @@ function Layout() {
                   <DialogSlot
                     slot="content"
                     wrap={(el) => (
-                      <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
+                      <box
+                        flexDirection="column"
+                        flexGrow={1}
+                        flexShrink={1}
+                        minHeight={0}
+                        minWidth={0}
+                      >
                         {el}
                       </box>
                     )}
                     fallback={
-                      <box flexDirection="row" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
+                      <box
+                        flexDirection="row"
+                        flexGrow={1}
+                        flexShrink={1}
+                        minHeight={0}
+                        minWidth={0}
+                      >
                         <box
                           flexDirection="column"
                           flexGrow={s.readerOpen() ? 0 : 1}

@@ -106,14 +106,18 @@ export const searchRoutes = new Elysia({ prefix: "/search" }).get(
               if (uids.length === 0) return;
 
               const slice = uids.slice(-REMOTE_UID_CAP);
-              for await (const msg of client.fetch(slice, {
-                uid: true,
-                envelope: true,
-                flags: true,
-                labels: true,
-                threadId: true,
-                emailId: true,
-              } as unknown as Record<string, boolean>, { uid: true })) {
+              for await (const msg of client.fetch(
+                slice,
+                {
+                  uid: true,
+                  envelope: true,
+                  flags: true,
+                  labels: true,
+                  threadId: true,
+                  emailId: true,
+                } as unknown as Record<string, boolean>,
+                { uid: true },
+              )) {
                 if (abort.signal.aborted) break;
                 const gmMsgid = (msg as { emailId?: string }).emailId;
                 if (!gmMsgid || seen.has(gmMsgid)) continue;
@@ -123,9 +127,7 @@ export const searchRoutes = new Elysia({ prefix: "/search" }).get(
                   | { name?: string; mailbox?: string; host?: string }
                   | undefined;
                 const flagSet = Array.from(msg.flags ?? []);
-                const labelSet = Array.from(
-                  (msg as { labels?: Set<string> }).labels ?? [],
-                );
+                const labelSet = Array.from((msg as { labels?: Set<string> }).labels ?? []);
                 const inLocal = !!db()
                   .select({ g: messages.gmMsgid })
                   .from(messages)
@@ -143,9 +145,7 @@ export const searchRoutes = new Elysia({ prefix: "/search" }).get(
                   subject: env?.subject ?? null,
                   fromName: from?.name ?? null,
                   fromEmail:
-                    from && from.mailbox && from.host
-                      ? `${from.mailbox}@${from.host}`
-                      : null,
+                    from && from.mailbox && from.host ? `${from.mailbox}@${from.host}` : null,
                   date: env?.date ? new Date(env.date).getTime() : Date.now(),
                   read: flagSet.includes("\\Seen"),
                   starred: flagSet.includes("\\Flagged"),

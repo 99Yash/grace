@@ -11,12 +11,33 @@ const HTML_TO_TEXT_OPTS = {
   selectors: [
     { selector: "img", format: "skip" as const },
     { selector: "a", options: { ignoreHref: false, hideLinkHrefIfSameAsText: true } },
-    { selector: "table", format: "dataTable" as const },
-    { selector: ".preheader", format: "skip" as const },
     { selector: "style", format: "skip" as const },
     { selector: "script", format: "skip" as const },
+    { selector: "head", format: "skip" as const },
+    { selector: "meta", format: "skip" as const },
+    { selector: "link", format: "skip" as const },
+    { selector: "title", format: "skip" as const },
+    { selector: "hr", format: "skip" as const },
+    // Hidden-preview preheader patterns. Email clients render these to give a
+    // subject-line summary; in plain-text they'd leak above the real body.
+    // CSS attribute-substring selectors are literal, so `display:none` won't
+    // match `display: none` — we cover both spacings. Avoid opacity/max-height
+    // because those match legitimate fractional values (0.9, 0.5em) and strip
+    // real body content.
+    { selector: ".preheader", format: "skip" as const },
+    { selector: "[hidden]", format: "skip" as const },
+    { selector: "[style*='display:none'i]", format: "skip" as const },
+    { selector: "[style*='display: none'i]", format: "skip" as const },
+    { selector: "[style*='visibility:hidden'i]", format: "skip" as const },
+    { selector: "[style*='visibility: hidden'i]", format: "skip" as const },
+    { selector: "[style*='mso-hide:all'i]", format: "skip" as const },
   ],
 };
+
+// Collapse 3+ runs of lines-with-only-whitespace into a single blank line.
+// A plain /\n{3,}/ miss lines that carry spaces/tabs (common after skipped
+// elements leave indented whitespace behind).
+const BLANK_LINE_COLLAPSE = /(?:\n[ \t]*){3,}/g;
 
 /**
  * Derive readable plain text from HTML when a message has no usable text/plain
@@ -25,7 +46,7 @@ const HTML_TO_TEXT_OPTS = {
 export function deriveTextFromHtml(html: string | null | undefined): string | null {
   if (!html) return null;
   try {
-    const t = htmlToText(html, HTML_TO_TEXT_OPTS).trim();
+    const t = htmlToText(html, HTML_TO_TEXT_OPTS).replace(BLANK_LINE_COLLAPSE, "\n\n").trim();
     return t.length > 0 ? t : null;
   } catch {
     return null;
@@ -132,8 +153,9 @@ export async function fetchMessageBody(opts: FetchBodyOpts): Promise<FetchBodyRe
   const parsed = await simpleParser(source);
 
   const html = typeof parsed.html === "string" ? parsed.html : null;
-  const rawText = parsed.text ?? null;
-  const text = isTextUseful(rawText) ? rawText : (deriveTextFromHtml(html) ?? rawText);
+  // Store the raw plain-text part verbatim. Callers derive from HTML on read so
+  // html-to-text config changes apply to already-cached bodies without a rewrite.
+  const text = parsed.text ?? null;
 
   let htmlPath: string | null = null;
   if (html) {

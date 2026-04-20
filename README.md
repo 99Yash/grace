@@ -88,16 +88,16 @@ shipped and when.
 
 ## Scripts
 
-| Script | What it does |
-|---|---|
-| `bun run dev:server` | Run daemon + IMAP IDLE (turbo-watched) |
-| `bun run dev:tui` | Run TUI (connects to daemon on 127.0.0.1:3535) |
-| `bun run oauth:login` | Browser OAuth flow; stores tokens in Keychain |
+| Script                         | What it does                                     |
+| ------------------------------ | ------------------------------------------------ |
+| `bun run dev:server`           | Run daemon + IMAP IDLE (turbo-watched)           |
+| `bun run dev:tui`              | Run TUI (connects to daemon on 127.0.0.1:3535)   |
+| `bun run oauth:login`          | Browser OAuth flow; stores tokens in Keychain    |
 | `bun run oauth:logout [email]` | Clear Keychain entry; defaults to active account |
-| `bun run doctor` | Env + keychain + db + IMAP health check |
-| `bun run smoke:imap` | Standalone IMAP handshake |
-| `bun run smoke:bootstrap` | Pull N headers into SQLite |
-| `bun run check-types` | Project-wide `tsc -b` |
+| `bun run doctor`               | Env + keychain + db + IMAP health check          |
+| `bun run smoke:imap`           | Standalone IMAP handshake                        |
+| `bun run smoke:bootstrap`      | Pull N headers into SQLite                       |
+| `bun run check-types`          | Project-wide `tsc -b`                            |
 
 ## Layout
 

@@ -4,22 +4,22 @@ Forward-looking implementation plan. See `prd.md` for product intent and `progre
 
 ## Milestone status
 
-| ID | Title | Status | Notes |
-|----|-------|--------|-------|
-| M1 | Workspace + walking skeleton | ✅ done | bun workspaces, elysia daemon, opentui+solid TUI, Eden wired |
-| M2 | Google OAuth2 + Keychain | ✅ done | loopback+PKCE, `mail.google.com/` scope, keytar storage |
-| M3 | IMAP bootstrap + inbox list | ✅ done | drizzle schema, 500-msg bootstrap, `/api/messages`, scrollbox TUI |
-| M4 | Real-time IDLE + SSE | ✅ done | in-process event bus, `/api/events`, fetch-based SSE client, sub-second push |
-| M5 | Message reader | ✅ done | Enter opens body; hybrid bodies (SQLite text + disk HTML/raw); HTML→text server-side fallback for marketing mail; `v` w3m (capability-gated) / `V` browser-eject; local read-flip |
-| M5b | Partial sync + progressive backfill | ✅ done | 1000-msg backfill worker, sync progress pill, `persist.ts` extraction, `/api/capabilities` |
-| M5c | Two-phase search (local + remote) | ✅ done | SQLite LIKE + Gmail `X-GM-RAW` stream-merge, `/` overlay (manual keystroke handling, no dropped first char), opportunistic import on remote-only open |
-| M6 | Mutations (archive / read / star / trash / label) | ✅ done | optimistic UI + IMAP via `applyMutation`; `l` toggles Gmail labels via X-GM-LABELS STORE |
-| M7 | Folder sidebar + label pills | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; label pills in row; per-folder IDLE (cap 4 concurrent) landed via folder-manager |
-| M8 | Compose + SMTP send | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill with threading; Cc/Bcc fields (alt+c / alt+b); attachments (alt+a, comma-separated paths) |
-| M9 | Triage mode | ✅ done | fullscreen `shift+t`; space archive+next, a archive, r reply, j/k nav, m/s/#/e mutate, esc exit |
-| M10 | Command palette | ⬜ | `:` fuzzy over actions + contacts + inbox |
-| M11 | Claude features | ⬜ | summarize, draft, NL-select (`. "urgent from stripe"`) |
-| M12 | Network resilience + polish | 🟡 partial | IDLE reconnect-with-backoff via supervisor shipped; `grace doctor` CLI shipped; `grace oauth logout` shipped; README + SETUP.md shipped; network online/offline detection shipped (probes gstatic/204, kicks supervisors out of backoff on restore) |
+| ID  | Title                                             | Status     | Notes                                                                                                                                                                                                                                               |
+| --- | ------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1  | Workspace + walking skeleton                      | ✅ done    | bun workspaces, elysia daemon, opentui+solid TUI, Eden wired                                                                                                                                                                                        |
+| M2  | Google OAuth2 + Keychain                          | ✅ done    | loopback+PKCE, `mail.google.com/` scope, keytar storage                                                                                                                                                                                             |
+| M3  | IMAP bootstrap + inbox list                       | ✅ done    | drizzle schema, 500-msg bootstrap, `/api/messages`, scrollbox TUI                                                                                                                                                                                   |
+| M4  | Real-time IDLE + SSE                              | ✅ done    | in-process event bus, `/api/events`, fetch-based SSE client, sub-second push                                                                                                                                                                        |
+| M5  | Message reader                                    | ✅ done    | Enter opens body; hybrid bodies (SQLite text + disk HTML/raw); HTML→text server-side fallback for marketing mail; `v` w3m (capability-gated) / `V` browser-eject; local read-flip                                                                   |
+| M5b | Partial sync + progressive backfill               | ✅ done    | 1000-msg backfill worker, sync progress pill, `persist.ts` extraction, `/api/capabilities`                                                                                                                                                          |
+| M5c | Two-phase search (local + remote)                 | ✅ done    | SQLite LIKE + Gmail `X-GM-RAW` stream-merge, `/` overlay (manual keystroke handling, no dropped first char), opportunistic import on remote-only open                                                                                               |
+| M6  | Mutations (archive / read / star / trash / label) | ✅ done    | optimistic UI + IMAP via `applyMutation`; `l` toggles Gmail labels via X-GM-LABELS STORE                                                                                                                                                            |
+| M7  | Folder sidebar + label pills                      | 🟡 partial | sidebar + lazy bootstrap/backfill on activate; label pills in row; per-folder IDLE (cap 4 concurrent) landed via folder-manager                                                                                                                     |
+| M8  | Compose + SMTP send                               | 🟡 partial | compose overlay + nodemailer XOAUTH2 send; draft persistence + reply pre-fill with threading; Cc/Bcc fields (alt+c / alt+b); attachments (alt+a, comma-separated paths)                                                                             |
+| M9  | Triage mode                                       | ✅ done    | fullscreen `shift+t`; space archive+next, a archive, r reply, j/k nav, m/s/#/e mutate, esc exit                                                                                                                                                     |
+| M10 | Command palette                                   | ⬜         | `:` fuzzy over actions + contacts + inbox                                                                                                                                                                                                           |
+| M11 | Claude features                                   | ⬜         | summarize, draft, NL-select (`. "urgent from stripe"`)                                                                                                                                                                                              |
+| M12 | Network resilience + polish                       | 🟡 partial | IDLE reconnect-with-backoff via supervisor shipped; `grace doctor` CLI shipped; `grace oauth logout` shipped; README + SETUP.md shipped; network online/offline detection shipped (probes gstatic/204, kicks supervisors out of backoff on restore) |
 
 ## M5 — Message reader (done)
 

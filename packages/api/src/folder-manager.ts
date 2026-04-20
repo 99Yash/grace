@@ -1,10 +1,6 @@
 import { loadActiveAccount } from "@grace/auth";
 import { requireGoogleOAuth } from "@grace/env/server";
-import {
-  startFolderManager,
-  type FolderManager,
-  type IdleSupervisorStatus,
-} from "@grace/mail";
+import { startFolderManager, type FolderManager, type IdleSupervisorStatus } from "@grace/mail";
 import { bus } from "./bus.ts";
 import { db } from "./db.ts";
 
@@ -48,10 +44,7 @@ export function getFolderManager(): FolderManager | null {
       }
     },
     onError: (err, ctx) => {
-      console.error(
-        `[idle:${ctx.folder}] attempt ${ctx.attempt} failed:`,
-        formatImapError(err),
-      );
+      console.error(`[idle:${ctx.folder}] attempt ${ctx.attempt} failed:`, formatImapError(err));
     },
   });
   return manager;
@@ -90,10 +83,7 @@ function formatImapError(err: unknown): string {
   if (e.responseText) parts.push(`response="${e.responseText}"`);
   if (e.serverResponseCode) parts.push(`code=${e.serverResponseCode}`);
   if (e.authenticationFailed) parts.push("auth-failed");
-  if (
-    e.responseText &&
-    /too many simultaneous connections/i.test(e.responseText)
-  ) {
+  if (e.responseText && /too many simultaneous connections/i.test(e.responseText)) {
     parts.push("(Gmail 15-conn cap — wait ~60s and restart, or kill stale bun processes)");
   }
   return parts.join(" · ");

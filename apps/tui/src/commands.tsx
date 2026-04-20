@@ -26,14 +26,22 @@ const INBOX_TABS: { id: InboxCategory; title: string }[] = [
 function folderLabel(f: Folder): string {
   if (f.path === "INBOX") return "Inbox";
   switch (f.specialUse) {
-    case "\\All": return "All Mail";
-    case "\\Sent": return "Sent";
-    case "\\Drafts": return "Drafts";
-    case "\\Trash": return "Trash";
-    case "\\Junk": return "Spam";
-    case "\\Flagged": return "Starred";
-    case "\\Important": return "Important";
-    default: return f.name;
+    case "\\All":
+      return "All Mail";
+    case "\\Sent":
+      return "Sent";
+    case "\\Drafts":
+      return "Drafts";
+    case "\\Trash":
+      return "Trash";
+    case "\\Junk":
+      return "Spam";
+    case "\\Flagged":
+      return "Starred";
+    case "\\Important":
+      return "Important";
+    default:
+      return f.name;
   }
 }
 
@@ -90,7 +98,9 @@ export function CommandRegistry() {
         category: "Mail",
         keybind: "mail.toggleRead",
         enabled: hasMsg,
-        onSelect: () => { if (m) void s.runMutation(m, "toggle-read"); },
+        onSelect: () => {
+          if (m) void s.runMutation(m, "toggle-read");
+        },
       },
       {
         title: m?.starred ? "Unstar" : "Star",
@@ -98,7 +108,9 @@ export function CommandRegistry() {
         category: "Mail",
         keybind: "mail.toggleStar",
         enabled: hasMsg,
-        onSelect: () => { if (m) void s.runMutation(m, "toggle-star"); },
+        onSelect: () => {
+          if (m) void s.runMutation(m, "toggle-star");
+        },
       },
       {
         title: "Archive",
@@ -106,7 +118,9 @@ export function CommandRegistry() {
         category: "Mail",
         keybind: "mail.archive",
         enabled: hasMsg,
-        onSelect: () => { if (m) void s.runMutation(m, "archive"); },
+        onSelect: () => {
+          if (m) void s.runMutation(m, "archive");
+        },
       },
       {
         title: "Move to trash",
@@ -114,7 +128,9 @@ export function CommandRegistry() {
         category: "Mail",
         keybind: "mail.trash",
         enabled: hasMsg,
-        onSelect: () => { if (m) void s.runMutation(m, "trash"); },
+        onSelect: () => {
+          if (m) void s.runMutation(m, "trash");
+        },
       },
       {
         title: "Toggle label…",

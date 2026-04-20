@@ -112,13 +112,13 @@ Future optimisation: a dedicated `category TEXT` column for indexed filters. Ski
 
 ### Integration points
 
-| Trigger | What runs | Cost |
-|---------|-----------|------|
-| Bootstrap (first sync of INBOX) | `syncCategories` after IMAP completes | 5 calls, one-shot |
-| Backfill batch finishes | `syncCategories` after each 200-msg batch lands | 5 calls per batch |
-| `mail.received` SSE event | `messages.get?id=X&fields=labelIds` for the one new message | 1 call |
-| Manual refresh (`r` or palette action) | `syncCategories` | 5 calls |
-| Folder switch to INBOX | `syncCategories` if last run > 5 min ago | 5 calls, debounced |
+| Trigger                                | What runs                                                   | Cost               |
+| -------------------------------------- | ----------------------------------------------------------- | ------------------ |
+| Bootstrap (first sync of INBOX)        | `syncCategories` after IMAP completes                       | 5 calls, one-shot  |
+| Backfill batch finishes                | `syncCategories` after each 200-msg batch lands             | 5 calls per batch  |
+| `mail.received` SSE event              | `messages.get?id=X&fields=labelIds` for the one new message | 1 call             |
+| Manual refresh (`r` or palette action) | `syncCategories`                                            | 5 calls            |
+| Folder switch to INBOX                 | `syncCategories` if last run > 5 min ago                    | 5 calls, debounced |
 
 `messages.get` for a single new message is the right tool for `mail.received`: we already know the ID, batching 5 listing calls per new message would be wasteful.
 
@@ -132,7 +132,7 @@ Future optimisation: a dedicated `category TEXT` column for indexed filters. Ski
 2. **Message assigned to two categories.** Doesn't happen — Gmail assigns exactly one — but our merge is idempotent either way.
 3. **Message moved out of INBOX but still in its category.** `messages.list` returns it; we label it. The INBOX-scoped tab filter never shows it because it's not in our INBOX query results. No harm.
 4. **Local row has no `gmMsgid`.** `persistHeaderMessage` already skips rows without an `emailId`. Nothing to join on; API results silently drop.
-5. **Primary filter semantics.** Our current Primary filter is *"has none of the other four categories"*. Proposal: keep inverse rather than switching to *"has `CATEGORY_PERSONAL`"*. Reason: accounts with categories disabled have no `CATEGORY_*` labels at all, and the inverse filter makes Primary = all of INBOX in that case, which is the right fallback. Switching to `CATEGORY_PERSONAL` would make Primary empty for those accounts.
+5. **Primary filter semantics.** Our current Primary filter is _"has none of the other four categories"_. Proposal: keep inverse rather than switching to _"has `CATEGORY_PERSONAL`"_. Reason: accounts with categories disabled have no `CATEGORY_*` labels at all, and the inverse filter makes Primary = all of INBOX in that case, which is the right fallback. Switching to `CATEGORY_PERSONAL` would make Primary empty for those accounts.
 6. **Category retroactively applied.** When a user turns Inbox Categories on, Gmail backfills labels on existing messages server-side. Our sync picks them up on the next run.
 7. **Token expiry mid-sync.** Refresh via `@grace/auth`, retry once. Second failure: abort this category, continue the others, log and move on.
 8. **Rate limit.** Well under quota. If we somehow hit `429`, respect `Retry-After` and surrender after 3 attempts.
@@ -143,13 +143,13 @@ Future optimisation: a dedicated `category TEXT` column for indexed filters. Ski
 
 ## Tradeoffs
 
-| Decision | Pro | Con |
-|----------|-----|-----|
-| Store categories in existing `messages.labels` JSON | No schema change | Requires SQL-side merge to avoid clobbering IMAP writes |
-| 5 list calls vs per-message get | 200× fewer API calls | Pagination needed for large categories |
-| Opportunistic sync (after IMAP batches) vs lazy (on tab click) | Tabs feel instant, no loading UI | Slight work on each sync event even if user never opens the tab |
-| Hex↔decimal at the JS layer | Zero DB migration | `BigInt` per match; cost is invisible at our scale |
-| IMAP as authoritative + HTTP API as augmenter | Additive, reversible, can be deleted if Gmail ever exposes categories over IMAP | Two sources of truth for labels; discipline required to keep IMAP label changes from overwriting categories (see edge case 11) |
+| Decision                                                       | Pro                                                                             | Con                                                                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Store categories in existing `messages.labels` JSON            | No schema change                                                                | Requires SQL-side merge to avoid clobbering IMAP writes                                                                        |
+| 5 list calls vs per-message get                                | 200× fewer API calls                                                            | Pagination needed for large categories                                                                                         |
+| Opportunistic sync (after IMAP batches) vs lazy (on tab click) | Tabs feel instant, no loading UI                                                | Slight work on each sync event even if user never opens the tab                                                                |
+| Hex↔decimal at the JS layer                                    | Zero DB migration                                                               | `BigInt` per match; cost is invisible at our scale                                                                             |
+| IMAP as authoritative + HTTP API as augmenter                  | Additive, reversible, can be deleted if Gmail ever exposes categories over IMAP | Two sources of truth for labels; discipline required to keep IMAP label changes from overwriting categories (see edge case 11) |
 
 ## Constraints
 

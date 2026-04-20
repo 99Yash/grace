@@ -28,7 +28,11 @@ export const folderRoutes = new Elysia({ prefix: "/folders" }).get(
     try {
       const entries = await withActionClient((client) => listFolders(client));
       const trackedNames = new Set(
-        db().select({ n: folders.name }).from(folders).all().map((r) => r.n),
+        db()
+          .select({ n: folders.name })
+          .from(folders)
+          .all()
+          .map((r) => r.n),
       );
       const data = entries.map((e) => toDTO(e, trackedNames.has(e.path)));
       cached = { at: Date.now(), data };

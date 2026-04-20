@@ -109,16 +109,18 @@ function startLoopbackServer(expectedState: string) {
     resolveCode(code);
   });
 
-  return new Promise<{ port: number; waitForCode: Promise<string>; close: () => void }>((resolve) => {
-    server.listen(0, "127.0.0.1", () => {
-      const addr = server.address() as AddressInfo;
-      resolve({
-        port: addr.port,
-        waitForCode,
-        close: () => server.close(),
+  return new Promise<{ port: number; waitForCode: Promise<string>; close: () => void }>(
+    (resolve) => {
+      server.listen(0, "127.0.0.1", () => {
+        const addr = server.address() as AddressInfo;
+        resolve({
+          port: addr.port,
+          waitForCode,
+          close: () => server.close(),
+        });
       });
-    });
-  });
+    },
+  );
 }
 
 function finish(res: import("node:http").ServerResponse, status: number, body: string) {
@@ -129,11 +131,16 @@ function finish(res: import("node:http").ServerResponse, status: number, body: s
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => {
     switch (c) {
-      case "&": return "&amp;";
-      case "<": return "&lt;";
-      case ">": return "&gt;";
-      case '"': return "&quot;";
-      default: return "&#39;";
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
     }
   });
 }

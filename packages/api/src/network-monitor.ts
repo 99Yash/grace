@@ -28,9 +28,7 @@ export function startNetworkMonitorSingleton(): NetworkMonitor {
           }
         }
       } else if (status.state === "offline") {
-        console.log(
-          `[network] offline${status.reason ? ` — ${status.reason}` : ""}`,
-        );
+        console.log(`[network] offline${status.reason ? ` — ${status.reason}` : ""}`);
       }
     },
     onError: (err) => {

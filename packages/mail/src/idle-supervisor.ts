@@ -4,12 +4,7 @@ import type { GraceDB } from "@grace/db";
 import { createImapClient } from "./imap.ts";
 import { startIdleWorker, type IdleWorker } from "./idle.ts";
 
-export type IdleSupervisorState =
-  | "idle"
-  | "connecting"
-  | "watching"
-  | "reconnecting"
-  | "stopped";
+export type IdleSupervisorState = "idle" | "connecting" | "watching" | "reconnecting" | "stopped";
 
 export interface IdleSupervisorStatus {
   state: IdleSupervisorState;

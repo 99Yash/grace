@@ -2,9 +2,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-const ROOT =
-  process.env.GRACE_DATA_DIR ??
-  `${process.env.HOME ?? "."}/.grace`;
+const ROOT = process.env.GRACE_DATA_DIR ?? `${process.env.HOME ?? "."}/.grace`;
 const DB_PATH = join(ROOT, "tui.db");
 
 let db: Database | undefined;

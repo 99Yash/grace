@@ -102,7 +102,10 @@ export async function fetchBody(gmMsgid: string): Promise<Body> {
   return r.data as Body;
 }
 
-export async function mutateMessage(gmMsgid: string, action: MutateAction): Promise<{ removed: boolean }> {
+export async function mutateMessage(
+  gmMsgid: string,
+  action: MutateAction,
+): Promise<{ removed: boolean }> {
   const r = await client.api.messages({ gmMsgid }).mutate.post({ action });
   if (r.error) throw r.error;
   return { removed: Boolean((r.data as { removed?: boolean })?.removed) };
@@ -114,7 +117,7 @@ export async function labelMessage(
 ): Promise<{ labels: string[] }> {
   const r = await client.api.messages({ gmMsgid }).labels.post(change);
   if (r.error) throw r.error;
-  return { labels: ((r.data as { labels?: string[] })?.labels ?? []) };
+  return { labels: (r.data as { labels?: string[] })?.labels ?? [] };
 }
 
 export async function sendDraft(draft: {
@@ -173,14 +176,48 @@ export async function importHit(hit: SearchHit): Promise<void> {
   if (r.error) throw r.error;
 }
 
-export async function w3mDump(htmlPath: string): Promise<string> {
-  const proc = Bun.spawn(["w3m", "-dump", "-T", "text/html", htmlPath], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const out = await new Response(proc.stdout).text();
-  await proc.exited;
-  return out;
+// Zero-width/format unicode used as preview-padding in modern HTML email
+// (U+034F combining grapheme joiner, U+200B-F zero-width space family, U+2060
+// word joiner, U+FEFF BOM, U+00AD soft hyphen). w3m renders these as visible
+// spacing that wraps into fragmented-looking text.
+const W3M_NOISE_CHARS = /[\u034F\u00AD\u200B-\u200F\u2060\uFEFF]/g;
+
+function cleanW3mOutput(raw: string): string {
+  return raw
+    .replace(W3M_NOISE_CHARS, "")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/(?:\n[ \t]*){3,}/g, "\n\n")
+    .trim();
+}
+
+export async function w3mDump(htmlPath: string, timeoutMs = 5000): Promise<string> {
+  // `display_link_number=1` makes w3m emit inline `[n]` markers and a
+  // References: section listing each URL. Without it, href-only links render
+  // as text with no way to see the destination.
+  const proc = Bun.spawn(
+    ["w3m", "-dump", "-o", "display_link_number=1", "-T", "text/html", htmlPath],
+    { stdout: "pipe", stderr: "pipe" },
+  );
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    try {
+      proc.kill();
+    } catch {}
+  }, timeoutMs);
+  try {
+    const out = await new Response(proc.stdout).text();
+    const code = await proc.exited;
+    if (timedOut) throw new Error(`w3m timed out after ${timeoutMs}ms`);
+    if (code !== 0) throw new Error(`w3m exited with code ${code}`);
+    const cleaned = cleanW3mOutput(out);
+    if (cleaned.length === 0) throw new Error("w3m produced no output");
+    return cleaned;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function openInBrowser(path: string): void {
@@ -228,9 +265,13 @@ export function orderFolders(fs: Folder[]): Folder[] {
 
 export function toastForAction(a: MutateAction): string {
   switch (a) {
-    case "archive": return "archived";
-    case "trash": return "moved to trash";
-    case "toggle-read": return "toggled read";
-    case "toggle-star": return "toggled star";
+    case "archive":
+      return "archived";
+    case "trash":
+      return "moved to trash";
+    case "toggle-read":
+      return "toggled read";
+    case "toggle-star":
+      return "toggled star";
   }
 }

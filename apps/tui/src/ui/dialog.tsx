@@ -74,9 +74,7 @@ export const dialog = {
 
   close(id?: string): boolean {
     if (store.stack.length === 0) return false;
-    const idx = id
-      ? store.stack.findIndex((e) => e.id === id)
-      : store.stack.length - 1;
+    const idx = id ? store.stack.findIndex((e) => e.id === id) : store.stack.length - 1;
     if (idx < 0) return false;
     const entry = store.stack[idx]!;
     entry.onClose?.();
@@ -93,7 +91,11 @@ export const dialog = {
   },
 };
 
-export function DialogSlot(props: { slot: DialogSlot; fallback: JSX.Element; wrap?: (el: JSX.Element) => JSX.Element }) {
+export function DialogSlot(props: {
+  slot: DialogSlot;
+  fallback: JSX.Element;
+  wrap?: (el: JSX.Element) => JSX.Element;
+}) {
   return (
     <Show when={dialog.topForSlot(props.slot)} keyed fallback={props.fallback}>
       {(entry: DialogEntry) => (props.wrap ? props.wrap(entry.element) : entry.element)}
@@ -107,13 +109,20 @@ export function DialogHost() {
     rendererRef = renderer;
   });
 
-  useKeyboard((e: { name: string; ctrl?: boolean; preventDefault?: () => void; defaultPrevented?: boolean }) => {
-    if (store.stack.length === 0) return;
-    if (e.defaultPrevented) return;
-    if (e.name !== "escape") return;
-    e.preventDefault?.();
-    dialog.close();
-  });
+  useKeyboard(
+    (e: {
+      name: string;
+      ctrl?: boolean;
+      preventDefault?: () => void;
+      defaultPrevented?: boolean;
+    }) => {
+      if (store.stack.length === 0) return;
+      if (e.defaultPrevented) return;
+      if (e.name !== "escape") return;
+      e.preventDefault?.();
+      dialog.close();
+    },
+  );
 
   return null;
 }

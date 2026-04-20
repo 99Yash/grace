@@ -32,14 +32,22 @@ export function TopBar() {
 function friendlyFolderName(path: string, specialUse: string | null | undefined): string {
   if (path === "INBOX") return "Inbox";
   switch (specialUse) {
-    case "\\All": return "All Mail";
-    case "\\Sent": return "Sent";
-    case "\\Drafts": return "Drafts";
-    case "\\Trash": return "Trash";
-    case "\\Junk": return "Spam";
-    case "\\Flagged": return "Starred";
-    case "\\Important": return "Important";
-    default: return path;
+    case "\\All":
+      return "All Mail";
+    case "\\Sent":
+      return "Sent";
+    case "\\Drafts":
+      return "Drafts";
+    case "\\Trash":
+      return "Trash";
+    case "\\Junk":
+      return "Spam";
+    case "\\Flagged":
+      return "Starred";
+    case "\\Important":
+      return "Important";
+    default:
+      return path;
   }
 }
 
@@ -74,7 +82,10 @@ export function FolderHeader() {
           flexShrink={0}
           paddingLeft={1}
           paddingRight={1}
-          onMouseDown={(e) => { e.preventDefault(); if (canPrev()) s.prevPage(); }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            if (canPrev()) s.prevPage();
+          }}
         >
           <text fg={canPrev() ? t.text : t.textFaint}>‹</text>
         </box>
@@ -82,11 +93,16 @@ export function FolderHeader() {
           flexShrink={0}
           paddingLeft={1}
           paddingRight={1}
-          onMouseDown={(e) => { e.preventDefault(); if (canNext()) s.nextPage(); }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            if (canNext()) s.nextPage();
+          }}
         >
           <text fg={canNext() ? t.text : t.textFaint}>›</text>
         </box>
-        <text fg={t.textFaint} flexShrink={0}>{"  "}</text>
+        <text fg={t.textFaint} flexShrink={0}>
+          {"  "}
+        </text>
       </Show>
       <Show when={s.syncProgress()}>
         <text fg={t.primarySoft} paddingRight={2}>

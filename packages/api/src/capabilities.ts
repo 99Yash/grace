@@ -9,9 +9,7 @@ export function getCapabilities(): Capabilities {
   const w3m = Bun.which("w3m") !== null;
   cache = { w3m };
   if (!w3m) {
-    console.log(
-      "[cap] w3m not found — `v` rich-render disabled. `brew install w3m` to enable.",
-    );
+    console.log("[cap] w3m not found — `v` rich-render disabled. `brew install w3m` to enable.");
   }
   return cache;
 }

@@ -21,7 +21,10 @@ export function ComposeOverlay() {
         <text attributes={1} fg={t.text} flexGrow={1}>
           compose
         </text>
-        <Show when={s.showComposeSpinner()} fallback={<text fg={t.textMuted}>{s.composeStatus()}</text>}>
+        <Show
+          when={s.showComposeSpinner()}
+          fallback={<text fg={t.textMuted}>{s.composeStatus()}</text>}
+        >
           <Spinner color={t.warning} label="sending…" />
         </Show>
       </box>
@@ -53,11 +56,14 @@ export function ComposeOverlay() {
         />
         <Show when={!s.composeShowCc() || !s.composeShowBcc() || !s.composeShowAttachments()}>
           <text fg={t.textFaint} flexShrink={0}>
-            {"  " + [
-              s.composeShowCc() ? null : "alt+c cc",
-              s.composeShowBcc() ? null : "alt+b bcc",
-              s.composeShowAttachments() ? null : "alt+a attach",
-            ].filter(Boolean).join(" · ")}
+            {"  " +
+              [
+                s.composeShowCc() ? null : "alt+c cc",
+                s.composeShowBcc() ? null : "alt+b bcc",
+                s.composeShowAttachments() ? null : "alt+a attach",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
           </text>
         </Show>
       </box>

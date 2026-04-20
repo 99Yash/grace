@@ -117,15 +117,30 @@ function HelpDialog() {
       >
         <For each={sections()}>
           {(section, sIdx) => (
-            <box flexDirection="column" paddingLeft={2} paddingRight={2} marginTop={sIdx() > 0 ? 1 : 0}>
-              <text fg={t.primarySoft} attributes={1}>{section.title}</text>
+            <box
+              flexDirection="column"
+              paddingLeft={2}
+              paddingRight={2}
+              marginTop={sIdx() > 0 ? 1 : 0}
+            >
+              <text fg={t.primarySoft} attributes={1}>
+                {section.title}
+              </text>
               <For each={section.rows}>
                 {(row) => (
                   <box flexDirection="row" height={1} paddingLeft={2}>
-                    <text fg={t.textBody} flexGrow={1} flexShrink={1} wrapMode="none" overflow="hidden">
+                    <text
+                      fg={t.textBody}
+                      flexGrow={1}
+                      flexShrink={1}
+                      wrapMode="none"
+                      overflow="hidden"
+                    >
                       {label(row.action)}
                     </text>
-                    <text fg={t.text} flexShrink={0}>{row.keys}</text>
+                    <text fg={t.text} flexShrink={0}>
+                      {row.keys}
+                    </text>
                   </box>
                 )}
               </For>
@@ -133,14 +148,10 @@ function HelpDialog() {
           )}
         </For>
       </scrollbox>
-      <box
-        height={1}
-        flexShrink={0}
-        paddingLeft={1}
-        paddingRight={1}
-        backgroundColor={t.field}
-      >
-        <text fg={t.textSubtle} flexGrow={1}>esc close</text>
+      <box height={1} flexShrink={0} paddingLeft={1} paddingRight={1} backgroundColor={t.field}>
+        <text fg={t.textSubtle} flexGrow={1}>
+          esc close
+        </text>
       </box>
     </box>
   );

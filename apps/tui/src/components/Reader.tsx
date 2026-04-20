@@ -28,7 +28,10 @@ function BodyHeader(props: { msg: Message; onBack: () => void }) {
         <box
           flexShrink={0}
           paddingRight={1}
-          onMouseDown={(e) => { e.preventDefault(); props.onBack(); }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            props.onBack();
+          }}
         >
           <text fg={t.primarySoft}>← Back</text>
         </box>
@@ -67,7 +70,8 @@ export function Reader() {
     if (s.renderMode() === "w3m" && s.rendered()) return null;
     const b = s.body();
     if (!b) return null;
-    if (!b.text && b.html) return "(no plain-text part — press v for w3m render or V to open in browser)";
+    if (!b.text && b.html)
+      return "(no plain-text part — press v for w3m render or V to open in browser)";
     return null;
   };
 
@@ -94,10 +98,24 @@ export function Reader() {
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} overflow="hidden">
       <BodyHeader msg={msg()} onBack={back} />
-      <Show when={!s.body.error} fallback={
-        <box padding={1}><text fg={t.error}>{`failed to load body: ${s.body.error instanceof Error ? s.body.error.message : String(s.body.error)}`}</text></box>
-      }>
-        <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0} paddingLeft={1} paddingRight={1}>
+      <Show
+        when={!s.body.error}
+        fallback={
+          <box padding={1}>
+            <text
+              fg={t.error}
+            >{`failed to load body: ${s.body.error instanceof Error ? s.body.error.message : String(s.body.error)}`}</text>
+          </box>
+        }
+      >
+        <scrollbox
+          scrollY
+          flexGrow={1}
+          flexShrink={1}
+          minHeight={0}
+          paddingLeft={1}
+          paddingRight={1}
+        >
           <Show when={s.body.loading && !showStale()}>
             <box flexDirection="row" padding={1}>
               <Spinner color={t.textSubtle} label="loading body…" />
@@ -109,7 +127,9 @@ export function Reader() {
             </box>
           </Show>
           <Show when={htmlOnlyHint()}>
-            <text fg={t.textMuted} wrapMode="word" width="100%">{htmlOnlyHint() ?? ""}</text>
+            <text fg={t.textMuted} wrapMode="word" width="100%">
+              {htmlOnlyHint() ?? ""}
+            </text>
           </Show>
           <For each={segments()}>
             {(seg) => {
@@ -139,7 +159,7 @@ export function Reader() {
               );
             }}
           </For>
-          <Show when={!showStale() && s.readerLinks().length > 0}>
+          <Show when={!showStale() && s.renderMode() !== "w3m" && s.readerLinks().length > 0}>
             <box height={1} flexShrink={0} />
             <text fg={t.textMuted}>links:</text>
             <For each={s.readerLinks()}>

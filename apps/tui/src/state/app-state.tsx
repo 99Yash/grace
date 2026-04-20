@@ -40,12 +40,7 @@ import {
 import { ComposeOverlay } from "../components/Compose.tsx";
 import { SearchOverlay } from "../components/Search.tsx";
 import { TriageView } from "../components/Triage.tsx";
-import {
-  buildQuotedBody,
-  buildReferences,
-  buildReplySubject,
-  extractUrls,
-} from "../format.ts";
+import { buildQuotedBody, buildReferences, buildReplySubject, extractUrls } from "../format.ts";
 import { useDeferredShow } from "../hooks/useDeferredShow.ts";
 import { subscribeSse, subscribeSseOnce } from "../sse.ts";
 import { dialog } from "../ui/dialog.tsx";
@@ -118,7 +113,9 @@ export function createAppState() {
   const [lastUpdated, setLastUpdated] = createSignal<number | null>(null);
   const [liveStatus, setLiveStatus] = createSignal<LiveStatus>("connecting");
   const [newFlash, setNewFlash] = createSignal<string | null>(null);
-  const [syncProgress, setSyncProgress] = createSignal<{ done: number; target: number } | null>(null);
+  const [syncProgress, setSyncProgress] = createSignal<{ done: number; target: number } | null>(
+    null,
+  );
   const [renderMode, setRenderMode] = createSignal<"text" | "w3m">("text");
   const [rendered, setRendered] = createSignal<string | null>(null);
   const [w3mBusy, setW3mBusy] = createSignal(false);
@@ -226,20 +223,20 @@ export function createAppState() {
     };
     try {
       const draft = await fetchCurrentDraft();
-      if (draft) prefill = {
-        to: draft.to,
-        ...(draft.cc ? { cc: draft.cc } : {}),
-        ...(draft.bcc ? { bcc: draft.bcc } : {}),
-        ...(draft.attachments ? { attachments: draft.attachments } : {}),
-        subject: draft.subject,
-        text: draft.text,
-      };
+      if (draft)
+        prefill = {
+          to: draft.to,
+          ...(draft.cc ? { cc: draft.cc } : {}),
+          ...(draft.bcc ? { bcc: draft.bcc } : {}),
+          ...(draft.attachments ? { attachments: draft.attachments } : {}),
+          subject: draft.subject,
+          text: draft.text,
+        };
     } catch {
       // Daemon unreachable or corrupt draft — start empty.
     }
     mountComposePrefill(prefill, "to");
-    const restored =
-      prefill.to || prefill.subject || prefill.text || prefill.attachments;
+    const restored = prefill.to || prefill.subject || prefill.text || prefill.attachments;
     setComposeStatus(
       restored
         ? "draft restored · tab field · alt+c cc · alt+b bcc · alt+a attach · ctrl+s send"
@@ -259,9 +256,15 @@ export function createAppState() {
   async function openReply() {
     if (composeOpen()) return;
     const m = currentMsg();
-    if (!m) { flashToast("no message to reply to", "warning"); return; }
+    if (!m) {
+      flashToast("no message to reply to", "warning");
+      return;
+    }
     const b = body();
-    if (!b) { flashToast("body still loading — try again in a moment", "warning"); return; }
+    if (!b) {
+      flashToast("body still loading — try again in a moment", "warning");
+      return;
+    }
     if (!b.messageId) {
       flashToast("no message-id on this message — sending without threading", "warning");
     }
@@ -395,17 +398,35 @@ export function createAppState() {
     const attachRaw = composeAttachments().trim();
     const subject = composeSubject().trim();
     const text = composeBody();
-    if (!to) { setComposeStatus("error: recipient required"); setComposeField("to"); return; }
-    if (!subject) { setComposeStatus("error: subject required"); setComposeField("subject"); return; }
-    if (!text.trim()) { setComposeStatus("error: body required"); setComposeField("body"); return; }
+    if (!to) {
+      setComposeStatus("error: recipient required");
+      setComposeField("to");
+      return;
+    }
+    if (!subject) {
+      setComposeStatus("error: subject required");
+      setComposeField("subject");
+      return;
+    }
+    if (!text.trim()) {
+      setComposeStatus("error: body required");
+      setComposeField("body");
+      return;
+    }
 
     const attachments = attachRaw
-      ? attachRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      ? attachRaw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
       : [];
 
     setComposeSending(true);
     setComposeStatus("sending…");
-    if (draftSaveTimer) { clearTimeout(draftSaveTimer); draftSaveTimer = null; }
+    if (draftSaveTimer) {
+      clearTimeout(draftSaveTimer);
+      draftSaveTimer = null;
+    }
     try {
       const reply = replyContext();
       const res = await sendDraft({
@@ -455,9 +476,7 @@ export function createAppState() {
     const list = messages();
     if (!list) return [];
     const p = pending();
-    const base = list
-      .filter((m) => !p[m.gmMsgid]?.removed)
-      .map((m) => applyPending(m));
+    const base = list.filter((m) => !p[m.gmMsgid]?.removed).map((m) => applyPending(m));
     if (activeFolder() !== "INBOX") return base;
     const cat = inboxCategory();
     if (cat === "all") return base;
@@ -635,7 +654,9 @@ export function createAppState() {
     return body()?.text ?? "";
   };
   const readerLinks = createMemo(() => extractUrls(readerText()));
-  function toggleQuotes() { setQuotesExpanded((v) => !v); }
+  function toggleQuotes() {
+    setQuotesExpanded((v) => !v);
+  }
   function openReaderLink(index: number): boolean {
     const url = readerLinks()[index];
     if (!url) return false;
@@ -792,7 +813,10 @@ export function createAppState() {
 
   function triageNext() {
     const list = visibleMessages();
-    if (list.length === 0) { closeTriage(); return; }
+    if (list.length === 0) {
+      closeTriage();
+      return;
+    }
     const next = triageIndex() + 1;
     if (next >= list.length) {
       flashToast("end of inbox", "info");
@@ -861,7 +885,10 @@ export function createAppState() {
 
   function openHtmlInBrowser() {
     const b = body();
-    if (!b?.htmlPath) { flashToast("no HTML part to open", "warning"); return; }
+    if (!b?.htmlPath) {
+      flashToast("no HTML part to open", "warning");
+      return;
+    }
     openInBrowser(b.htmlPath);
     flashToast("opened in browser", "success");
   }
@@ -1051,7 +1078,9 @@ export function createAppState() {
       const v = composeBody();
       if (v) r.setText(v);
     },
-    mountSearchInput: (r: InputRenderable) => { searchInput = r; },
+    mountSearchInput: (r: InputRenderable) => {
+      searchInput = r;
+    },
   };
 }
 

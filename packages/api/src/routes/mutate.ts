@@ -41,7 +41,11 @@ export const mutateRoutes = new Elysia().post(
       if (result.removedFromSource) {
         db().delete(messages).where(eq(messages.gmMsgid, gmMsgid)).run();
       } else if (action.type === "read") {
-        db().update(messages).set({ read: action.value }).where(eq(messages.gmMsgid, gmMsgid)).run();
+        db()
+          .update(messages)
+          .set({ read: action.value })
+          .where(eq(messages.gmMsgid, gmMsgid))
+          .run();
       } else if (action.type === "star") {
         db()
           .update(messages)

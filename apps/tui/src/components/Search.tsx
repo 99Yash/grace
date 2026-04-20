@@ -68,12 +68,21 @@ export function SearchOverlay() {
         />
       </box>
       <box flexDirection="row" height={1} flexShrink={0} paddingLeft={1} paddingRight={1}>
-        <Switch fallback={<text fg={t.textSubtle} flexGrow={1}>type Gmail query · esc cancels</text>}>
+        <Switch
+          fallback={
+            <text fg={t.textSubtle} flexGrow={1}>
+              type Gmail query · esc cancels
+            </text>
+          }
+        >
           <Match when={s.searchPhase() === "searching"}>
             <Spinner color={t.textSubtle} label="searching…" />
           </Match>
           <Match when={s.searchPhase() === "local-done"}>
-            <Spinner color={t.textSubtle} label={`local ${s.searchHits().length} · fetching Gmail…`} />
+            <Spinner
+              color={t.textSubtle}
+              label={`local ${s.searchHits().length} · fetching Gmail…`}
+            />
           </Match>
           <Match when={s.searchPhase() === "done"}>
             <text fg={t.textSubtle} flexGrow={1}>
@@ -81,18 +90,25 @@ export function SearchOverlay() {
             </text>
           </Match>
           <Match when={s.searchPhase() === "error"}>
-            <text fg={t.error} flexGrow={1}>error: {s.searchError() ?? "unknown"}</text>
+            <text fg={t.error} flexGrow={1}>
+              error: {s.searchError() ?? "unknown"}
+            </text>
           </Match>
         </Switch>
       </box>
       <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0}>
-        <For each={s.searchHits()} fallback={
-          <box padding={1}><text fg={t.textSubtle}>
-            <Show when={s.searchQuery() === ""} fallback="no results yet">
-              start typing to search local cache + Gmail
-            </Show>
-          </text></box>
-        }>
+        <For
+          each={s.searchHits()}
+          fallback={
+            <box padding={1}>
+              <text fg={t.textSubtle}>
+                <Show when={s.searchQuery() === ""} fallback="no results yet">
+                  start typing to search local cache + Gmail
+                </Show>
+              </text>
+            </box>
+          }
+        >
           {(hit, i) => <SearchHitRow hit={hit} selected={s.searchSelected() === i()} />}
         </For>
       </scrollbox>

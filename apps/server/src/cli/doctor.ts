@@ -68,7 +68,8 @@ if (!email) {
     else fail("refresh token missing — re-run `oauth:login`");
     const remaining = tokens.expiresAt - Date.now();
     if (remaining > 60_000) pass(`access token expires in ${Math.round(remaining / 60_000)}m`);
-    else if (remaining > 0) warn(`access token expires in ${Math.round(remaining / 1000)}s (auto-refresh on next use)`);
+    else if (remaining > 0)
+      warn(`access token expires in ${Math.round(remaining / 1000)}s (auto-refresh on next use)`);
     else warn("access token expired (auto-refresh on next use)");
     if (tokens.scope?.includes("https://mail.google.com/")) pass("scope includes mail.google.com");
     else fail(`scope missing mail.google.com (got: ${tokens.scope ?? "(none)"})`);

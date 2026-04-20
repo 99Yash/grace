@@ -33,7 +33,8 @@ export function subscribeSse(url: string, handlers: SseHandlers): () => void {
               for (const line of chunk.split("\n")) {
                 if (line.startsWith(":")) continue;
                 if (line.startsWith("event:")) eventType = line.slice(6).trim();
-                else if (line.startsWith("data:")) data += (data ? "\n" : "") + line.slice(5).trimStart();
+                else if (line.startsWith("data:"))
+                  data += (data ? "\n" : "") + line.slice(5).trimStart();
               }
               if (data) handlers.onEvent(eventType, data);
             }
@@ -88,7 +89,8 @@ export function subscribeSseOnce(url: string, handlers: SseHandlers): () => void
             for (const line of chunk.split("\n")) {
               if (line.startsWith(":")) continue;
               if (line.startsWith("event:")) eventType = line.slice(6).trim();
-              else if (line.startsWith("data:")) data += (data ? "\n" : "") + line.slice(5).trimStart();
+              else if (line.startsWith("data:"))
+                data += (data ? "\n" : "") + line.slice(5).trimStart();
             }
             if (data) handlers.onEvent(eventType, data);
           }

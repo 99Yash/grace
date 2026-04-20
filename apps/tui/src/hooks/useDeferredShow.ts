@@ -10,7 +10,10 @@ export function useDeferredShow(active: () => boolean, showDelayMs = 500, minHol
 
   createEffect(() => {
     if (active()) {
-      if (hold) { clearTimeout(hold); hold = undefined; }
+      if (hold) {
+        clearTimeout(hold);
+        hold = undefined;
+      }
       if (show() || wait) return;
       wait = setTimeout(() => {
         wait = undefined;
@@ -19,11 +22,20 @@ export function useDeferredShow(active: () => boolean, showDelayMs = 500, minHol
       }, showDelayMs);
       return;
     }
-    if (wait) { clearTimeout(wait); wait = undefined; }
+    if (wait) {
+      clearTimeout(wait);
+      wait = undefined;
+    }
     if (!show() || hold) return;
     const left = minHoldMs - (Date.now() - shownAt);
-    if (left <= 0) { setShow(false); return; }
-    hold = setTimeout(() => { hold = undefined; setShow(false); }, left);
+    if (left <= 0) {
+      setShow(false);
+      return;
+    }
+    hold = setTimeout(() => {
+      hold = undefined;
+      setShow(false);
+    }, left);
   });
 
   onCleanup(() => {

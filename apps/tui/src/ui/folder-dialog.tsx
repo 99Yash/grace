@@ -6,14 +6,22 @@ import { DialogSelect, type DialogSelectOption } from "./dialog-select.tsx";
 function folderLabel(f: Folder): string {
   if (f.path === "INBOX") return "Inbox";
   switch (f.specialUse) {
-    case "\\All": return "All Mail";
-    case "\\Sent": return "Sent";
-    case "\\Drafts": return "Drafts";
-    case "\\Trash": return "Trash";
-    case "\\Junk": return "Spam";
-    case "\\Flagged": return "Starred";
-    case "\\Important": return "Important";
-    default: return f.name;
+    case "\\All":
+      return "All Mail";
+    case "\\Sent":
+      return "Sent";
+    case "\\Drafts":
+      return "Drafts";
+    case "\\Trash":
+      return "Trash";
+    case "\\Junk":
+      return "Spam";
+    case "\\Flagged":
+      return "Starred";
+    case "\\Important":
+      return "Important";
+    default:
+      return f.name;
   }
 }
 

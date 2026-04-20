@@ -92,14 +92,18 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     return groups;
   });
 
-  const flat = createMemo<DialogSelectOption<T>[]>(() =>
-    grouped().flatMap((g) => g.options),
-  );
+  const flat = createMemo<DialogSelectOption<T>[]>(() => grouped().flatMap((g) => g.options));
 
   const dims = useTerminalDimensions();
   const maxHeight = createMemo(() => Math.max(4, Math.floor(dims().height / 2) - 4));
 
-  createEffect(on(() => store.filter, () => moveTo(0), { defer: true }));
+  createEffect(
+    on(
+      () => store.filter,
+      () => moveTo(0),
+      { defer: true },
+    ),
+  );
 
   function moveTo(next: number) {
     const list = flat();
@@ -124,15 +128,42 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   }
 
   useKeyboard((e) => {
-    if (e.name === "up" || (e.ctrl && e.name === "p")) { e.preventDefault?.(); move(-1); return; }
-    if (e.name === "down" || (e.ctrl && e.name === "n")) { e.preventDefault?.(); move(1); return; }
-    if (e.name === "pageup") { e.preventDefault?.(); move(-10); return; }
-    if (e.name === "pagedown") { e.preventDefault?.(); move(10); return; }
-    if (e.name === "home") { e.preventDefault?.(); moveTo(0); return; }
-    if (e.name === "end") { e.preventDefault?.(); moveTo(flat().length - 1); return; }
+    if (e.name === "up" || (e.ctrl && e.name === "p")) {
+      e.preventDefault?.();
+      move(-1);
+      return;
+    }
+    if (e.name === "down" || (e.ctrl && e.name === "n")) {
+      e.preventDefault?.();
+      move(1);
+      return;
+    }
+    if (e.name === "pageup") {
+      e.preventDefault?.();
+      move(-10);
+      return;
+    }
+    if (e.name === "pagedown") {
+      e.preventDefault?.();
+      move(10);
+      return;
+    }
+    if (e.name === "home") {
+      e.preventDefault?.();
+      moveTo(0);
+      return;
+    }
+    if (e.name === "end") {
+      e.preventDefault?.();
+      moveTo(flat().length - 1);
+      return;
+    }
     if (e.name === "return") {
       const opt = flat()[store.selected];
-      if (opt) { e.preventDefault?.(); props.onSelect(opt); }
+      if (opt) {
+        e.preventDefault?.();
+        props.onSelect(opt);
+      }
     }
   });
 
@@ -140,14 +171,18 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     <box flexDirection="column" paddingTop={1} paddingBottom={1} gap={1}>
       <Show when={props.title}>
         <box paddingLeft={2} paddingRight={2}>
-          <text fg={t.textBright} attributes={1}>{props.title}</text>
+          <text fg={t.textBright} attributes={1}>
+            {props.title}
+          </text>
         </box>
       </Show>
       <box paddingLeft={2} paddingRight={2} backgroundColor={t.field}>
         <input
           ref={(r: InputRenderable) => {
             inputRef = r;
-            setTimeout(() => { if (inputRef && !inputRef.isDestroyed) inputRef.focus(); }, 1);
+            setTimeout(() => {
+              if (inputRef && !inputRef.isDestroyed) inputRef.focus();
+            }, 1);
           }}
           placeholder={props.placeholder ?? "filter…"}
           placeholderColor={t.textSubtle}
@@ -156,10 +191,12 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
           cursorColor={t.primary}
           backgroundColor="transparent"
           focusedBackgroundColor="transparent"
-          onInput={(v: string) => batch(() => {
-            setStore("filter", v);
-            props.onFilter?.(v);
-          })}
+          onInput={(v: string) =>
+            batch(() => {
+              setStore("filter", v);
+              props.onFilter?.(v);
+            })
+          }
         />
       </box>
       <Show
@@ -183,44 +220,29 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
               <>
                 <Show when={group.category}>
                   <box paddingLeft={2} paddingTop={groupIdx() > 0 ? 1 : 0}>
-                    <text fg={t.primarySoft} attributes={1}>{group.category}</text>
+                    <text fg={t.accent} attributes={1}>
+                      {group.category}
+                    </text>
                   </box>
                 </Show>
                 <For each={group.options}>
                   {(opt, idx) => {
-                      const absIdx = () => group.offset + idx();
-                      const active = () => store.selected === absIdx();
-                      return (
-                        <box
-                          id={optionId(absIdx())}
-                          flexDirection="row"
-                          paddingLeft={2}
-                          paddingRight={2}
-                          backgroundColor={active() ? t.selection : "transparent"}
-                          gap={1}
-                        >
-                          <Show
-                            when={active()}
-                            fallback={
-                              <text
-                                fg={t.textBright}
-                                flexGrow={1}
-                                flexShrink={1}
-                                overflow="hidden"
-                                wrapMode="none"
-                              >
-                                {opt.title}
-                                <Show when={opt.description}>
-                                  <span style={{ fg: t.textMuted }}>
-                                    {"  " + opt.description}
-                                  </span>
-                                </Show>
-                              </text>
-                            }
-                          >
+                    const absIdx = () => group.offset + idx();
+                    const active = () => store.selected === absIdx();
+                    return (
+                      <box
+                        id={optionId(absIdx())}
+                        flexDirection="row"
+                        paddingLeft={2}
+                        paddingRight={2}
+                        backgroundColor={active() ? t.selection : "transparent"}
+                        gap={1}
+                      >
+                        <Show
+                          when={active()}
+                          fallback={
                             <text
-                              fg={t.text}
-                              attributes={1}
+                              fg={t.textBright}
                               flexGrow={1}
                               flexShrink={1}
                               overflow="hidden"
@@ -228,19 +250,34 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                             >
                               {opt.title}
                               <Show when={opt.description}>
-                                <span style={{ fg: t.primaryOnSelection }}>
-                                  {"  " + opt.description}
-                                </span>
+                                <span style={{ fg: t.textMuted }}>{"  " + opt.description}</span>
                               </Show>
                             </text>
-                          </Show>
-                          <Show when={opt.footer}>
-                            <text fg={active() ? t.primaryOnSelection : t.textSubtle} flexShrink={0}>
-                              {opt.footer}
-                            </text>
-                          </Show>
-                        </box>
-                      );
+                          }
+                        >
+                          <text
+                            fg={t.text}
+                            attributes={1}
+                            flexGrow={1}
+                            flexShrink={1}
+                            overflow="hidden"
+                            wrapMode="none"
+                          >
+                            {opt.title}
+                            <Show when={opt.description}>
+                              <span style={{ fg: t.primaryOnSelection }}>
+                                {"  " + opt.description}
+                              </span>
+                            </Show>
+                          </text>
+                        </Show>
+                        <Show when={opt.footer}>
+                          <text fg={active() ? t.primaryOnSelection : t.textSubtle} flexShrink={0}>
+                            {opt.footer}
+                          </text>
+                        </Show>
+                      </box>
+                    );
                   }}
                 </For>
               </>

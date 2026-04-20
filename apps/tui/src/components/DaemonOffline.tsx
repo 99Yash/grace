@@ -30,15 +30,10 @@ export function DaemonOffline() {
         daemon unreachable
       </text>
       <box height={1} />
-      <text fg={t.textMuted}>
-        grace can't talk to the local daemon on 127.0.0.1:3535
-      </text>
+      <text fg={t.textMuted}>grace can't talk to the local daemon on 127.0.0.1:3535</text>
       <text fg={t.textMuted}>start it with `bun run dev:server` in another pane</text>
       <box height={1} />
-      <Show
-        when={retrying()}
-        fallback={<text fg={t.primarySoft}>press enter or r to retry</text>}
-      >
+      <Show when={retrying()} fallback={<text fg={t.primarySoft}>press enter or r to retry</text>}>
         <Spinner label="retrying…" />
       </Show>
     </box>

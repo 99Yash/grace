@@ -4,11 +4,7 @@ import { homedir } from "node:os";
 import { basename, isAbsolute, resolve } from "node:path";
 import { getFreshAccessToken, loadActiveAccount } from "@grace/auth";
 import { requireGoogleOAuth } from "@grace/env/server";
-import {
-  parseRecipients,
-  sendMessage,
-  type SendMessageAttachment,
-} from "@grace/mail";
+import { parseRecipients, sendMessage, type SendMessageAttachment } from "@grace/mail";
 import { bus } from "../bus.ts";
 
 function expandHome(raw: string): string {
@@ -92,9 +88,7 @@ export const sendRoutes = new Elysia().post(
         subject,
         text: body.text,
         ...(body.inReplyTo ? { inReplyTo: body.inReplyTo } : {}),
-        ...(body.references && body.references.length > 0
-          ? { references: body.references }
-          : {}),
+        ...(body.references && body.references.length > 0 ? { references: body.references } : {}),
         ...(attach.list.length > 0 ? { attachments: attach.list } : {}),
       });
       bus.publish({

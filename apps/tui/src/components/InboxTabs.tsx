@@ -37,7 +37,12 @@ export function InboxTabs() {
 
   const counts = createMemo(() => {
     const c: Record<InboxCategory, number> = {
-      primary: 0, promotions: 0, social: 0, updates: 0, forums: 0, all: 0,
+      primary: 0,
+      promotions: 0,
+      social: 0,
+      updates: 0,
+      forums: 0,
+      all: 0,
     };
     const list = s.messages();
     if (!list) return c;
@@ -75,16 +80,11 @@ export function InboxTabs() {
                   s.setInboxCategory(tab.id);
                 }}
               >
-                <text
-                  fg={active() ? t.text : t.textMuted}
-                  attributes={active() ? 1 : 0}
-                >
+                <text fg={active() ? t.text : t.textMuted} attributes={active() ? 1 : 0}>
                   {tab.label}
                 </text>
                 <Show when={count() > 0}>
-                  <text fg={active() ? t.primaryOnSelection : t.textFaint}>
-                    {` ${count()}`}
-                  </text>
+                  <text fg={active() ? t.primaryOnSelection : t.textFaint}>{` ${count()}`}</text>
                 </Show>
               </box>
             );

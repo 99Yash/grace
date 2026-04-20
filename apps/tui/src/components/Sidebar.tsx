@@ -12,11 +12,7 @@ function FolderRow(props: {
 }) {
   const t = useTheme();
   const fg = () =>
-    props.focused && props.selected
-      ? t.text
-      : props.selected
-        ? t.textBody
-        : t.textMuted;
+    props.focused && props.selected ? t.text : props.selected ? t.textBody : t.textMuted;
   const countFg = () => ((props.folder.unseen ?? 0) > 0 ? t.primary : t.textFaint);
   const label = () => {
     if (props.folder.path === "INBOX") return "Inbox";
@@ -37,9 +33,7 @@ function FolderRow(props: {
       overflow="hidden"
       paddingLeft={1}
       paddingRight={1}
-      backgroundColor={
-        props.selected ? (props.focused ? t.selection : t.field) : "transparent"
-      }
+      backgroundColor={props.selected ? (props.focused ? t.selection : t.field) : "transparent"}
       onMouseDown={() => props.onClick()}
     >
       <text fg={fg()} flexGrow={1} flexShrink={1}>
@@ -79,16 +73,19 @@ export function Sidebar() {
         </text>
       </box>
       <scrollbox scrollY flexGrow={1} flexShrink={1} minHeight={0}>
-        <For each={s.orderedFolders()} fallback={
-          <box padding={1}><text fg={t.textSubtle}>loading…</text></box>
-        }>
+        <For
+          each={s.orderedFolders()}
+          fallback={
+            <box padding={1}>
+              <text fg={t.textSubtle}>loading…</text>
+            </box>
+          }
+        >
           {(f, i) => (
             <FolderRow
               folder={f}
               selected={
-                s.sidebarFocused()
-                  ? s.folderSelected() === i()
-                  : f.path === s.activeFolder()
+                s.sidebarFocused() ? s.folderSelected() === i() : f.path === s.activeFolder()
               }
               focused={s.sidebarFocused()}
               onClick={() => void s.switchFolder(f.path)}

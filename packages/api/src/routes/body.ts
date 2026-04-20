@@ -43,16 +43,11 @@ export const bodyRoutes = new Elysia().get(
 
     const cached = db().select().from(bodies).where(eq(bodies.gmMsgid, gmMsgid)).get();
     if (cached) {
-      const html =
-        cached.htmlPath !== null ? safeReadUtf8(cached.htmlPath) : null;
-      let text = cached.text;
-      if (!isTextUseful(text)) {
-        const derived = deriveTextFromHtml(html);
-        if (derived) {
-          text = derived;
-          db().update(bodies).set({ text }).where(eq(bodies.gmMsgid, gmMsgid)).run();
-        }
-      }
+      const html = cached.htmlPath !== null ? safeReadUtf8(cached.htmlPath) : null;
+      // Re-derive on read so html-to-text config changes apply retroactively.
+      // Fall back to the stored raw plain-text part when there's no HTML.
+      const derived = html ? deriveTextFromHtml(html) : null;
+      const text = derived ?? (isTextUseful(cached.text) ? cached.text : null);
       const rawHeader = cached.rawPath ? safeReadHead(cached.rawPath, 32 * 1024) : null;
       const headers = rawHeader
         ? extractReplyHeaders(rawHeader)
@@ -96,9 +91,11 @@ export const bodyRoutes = new Elysia().get(
       .onConflictDoNothing()
       .run();
 
+    const freshDerived = fetched.html ? deriveTextFromHtml(fetched.html) : null;
+    const freshText = freshDerived ?? (isTextUseful(fetched.text) ? fetched.text : null);
     return {
       gmMsgid: fetched.gmMsgid,
-      text: fetched.text,
+      text: freshText,
       html: fetched.html,
       htmlPath: fetched.htmlPath,
       rawPath: fetched.rawPath,
@@ -142,7 +139,9 @@ function safeReadHead(path: string, bytes: number): string | null {
     return null;
   } finally {
     if (fd !== null) {
-      try { closeSync(fd); } catch {}
+      try {
+        closeSync(fd);
+      } catch {}
     }
   }
 }

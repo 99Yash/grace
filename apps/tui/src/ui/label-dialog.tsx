@@ -56,7 +56,10 @@ function LabelDialog() {
         if (!msg) return;
         const applied = (msg.labels ?? []).includes(opt.value);
         closeLabelPicker();
-        void s.applyLabelChange(msg.gmMsgid, applied ? { remove: [opt.value] } : { add: [opt.value] });
+        void s.applyLabelChange(
+          msg.gmMsgid,
+          applied ? { remove: [opt.value] } : { add: [opt.value] },
+        );
       }}
     />
   );

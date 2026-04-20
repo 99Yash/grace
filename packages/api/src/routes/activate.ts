@@ -105,10 +105,7 @@ async function activateFolder(folderName: string): Promise<ActivateResult> {
       .then(() => maybeSyncCategories(folderName))
       .catch((err) => {
         backfilled.delete(folderName);
-        console.error(
-          `[backfill] ${folderName} failed:`,
-          err instanceof Error ? err.message : err,
-        );
+        console.error(`[backfill] ${folderName} failed:`, err instanceof Error ? err.message : err);
       });
   }
 

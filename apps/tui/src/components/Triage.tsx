@@ -23,9 +23,7 @@ export function TriageView() {
         <text attributes={1} fg={t.primary} flexGrow={1}>
           triage · {s.activeFolder()}
         </text>
-        <text fg={t.textMuted}>
-          {total() === 0 ? "0/0" : `${position()}/${total()}`}
-        </text>
+        <text fg={t.textMuted}>{total() === 0 ? "0/0" : `${position()}/${total()}`}</text>
       </box>
       <Show
         when={s.currentMsg()}

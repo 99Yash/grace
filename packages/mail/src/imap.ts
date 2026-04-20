@@ -19,7 +19,8 @@ export function createImapClient(opts: GmailConnectOpts & { debug?: boolean }): 
           debug: (m) => console.log(`[imap] ${typeof m === "string" ? m : JSON.stringify(m)}`),
           info: (m) => console.log(`[imap:info] ${typeof m === "string" ? m : JSON.stringify(m)}`),
           warn: (m) => console.warn(`[imap:warn] ${typeof m === "string" ? m : JSON.stringify(m)}`),
-          error: (m) => console.error(`[imap:err] ${typeof m === "string" ? m : JSON.stringify(m)}`),
+          error: (m) =>
+            console.error(`[imap:err] ${typeof m === "string" ? m : JSON.stringify(m)}`),
         }
       : false,
     qresync: true,

@@ -38,13 +38,7 @@ const DEFAULT_LIMIT = 1000;
  */
 export async function syncCategories(opts: SyncCategoriesOpts): Promise<SyncCategoriesResult> {
   const started = Date.now();
-  const {
-    db,
-    folderName = "INBOX",
-    limit = DEFAULT_LIMIT,
-    signal,
-    onLabelChange,
-  } = opts;
+  const { db, folderName = "INBOX", limit = DEFAULT_LIMIT, signal, onLabelChange } = opts;
 
   const folder = db.select().from(folders).where(eq(folders.name, folderName)).get();
   if (!folder) {
@@ -114,7 +108,10 @@ function mergeCategoryLabel(
   let changed = 0;
   for (let i = 0; i < gmMsgids.length; i += CHUNK) {
     const chunk = gmMsgids.slice(i, i + CHUNK);
-    const ids = sql.join(chunk.map((v) => sql`${v}`), sql`, `);
+    const ids = sql.join(
+      chunk.map((v) => sql`${v}`),
+      sql`, `,
+    );
     const rows = db.all<{ gm_msgid: string }>(sql`
       UPDATE messages
          SET labels = json_insert(labels, '$[#]', ${category})
