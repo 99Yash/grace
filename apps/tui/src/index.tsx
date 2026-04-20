@@ -29,6 +29,13 @@ function Layout() {
     if (s.auth.error) return;
     if (s.auth() && !s.auth()!.signedIn) return;
 
+    // Palette is globally accessible from any view.
+    if (kb.match("app.palette", e)) {
+      e.preventDefault();
+      openPalette();
+      return;
+    }
+
     const list = s.visibleMessages();
     const total = list.length;
 
@@ -117,10 +124,6 @@ function Layout() {
       }
       if (kb.match("app.help", e)) {
         openHelp();
-        return;
-      }
-      if (kb.match("app.palette", e)) {
-        openPalette();
         return;
       }
       if (kb.match("app.themes", e)) {
@@ -240,10 +243,6 @@ function Layout() {
       openHelp();
       return;
     }
-    if (kb.match("app.palette", e)) {
-      openPalette();
-      return;
-    }
     if (kb.match("app.themes", e)) {
       openThemes();
       return;
@@ -346,34 +345,40 @@ function Layout() {
       <TopBar />
       <Switch
         fallback={
-          <>
-            <FolderHeader />
-            <box flexDirection="row" flexGrow={1} flexShrink={1} minHeight={0}>
-              <Sidebar />
-              <box width={1} flexShrink={0} backgroundColor={t.field} />
-              <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
-                <Show
-                  when={s.messages()}
-                  fallback={
-                    <box flexGrow={1} padding={1}>
-                      <text fg={t.textSubtle}>loading inbox…</text>
-                    </box>
-                  }
-                >
-                  <DialogSlot
-                    slot="content"
-                    wrap={(el) => (
-                      <box
-                        flexDirection="column"
-                        flexGrow={1}
-                        flexShrink={1}
-                        minHeight={0}
-                        minWidth={0}
-                      >
-                        {el}
-                      </box>
-                    )}
-                    fallback={
+          <DialogSlot
+            slot="content"
+            wrap={(el) => (
+              <box
+                flexDirection="column"
+                flexGrow={1}
+                flexShrink={1}
+                minHeight={0}
+                minWidth={0}
+              >
+                {el}
+              </box>
+            )}
+            fallback={
+              <>
+                <FolderHeader />
+                <box flexDirection="row" flexGrow={1} flexShrink={1} minHeight={0}>
+                  <Sidebar />
+                  <box width={1} flexShrink={0} backgroundColor={t.field} />
+                  <box
+                    flexDirection="column"
+                    flexGrow={1}
+                    flexShrink={1}
+                    minHeight={0}
+                    minWidth={0}
+                  >
+                    <Show
+                      when={s.messages()}
+                      fallback={
+                        <box flexGrow={1} padding={1}>
+                          <text fg={t.textSubtle}>loading inbox…</text>
+                        </box>
+                      }
+                    >
                       <box
                         flexDirection="row"
                         flexGrow={1}
@@ -401,12 +406,12 @@ function Layout() {
                           )}
                         </Show>
                       </box>
-                    }
-                  />
-                </Show>
-              </box>
-            </box>
-          </>
+                    </Show>
+                  </box>
+                </box>
+              </>
+            }
+          />
         }
       >
         <Match when={s.auth.error}>

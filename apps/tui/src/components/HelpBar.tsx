@@ -17,7 +17,7 @@ export function HelpBar() {
       backgroundColor={t.background}
     >
       <text fg={t.textFaint} flexGrow={1}>
-        <Switch fallback="ctrl+p palette · tab folders · j/k nav · enter open · ←/→ tabs · [/] page · c compose · e archive · / search">
+        <Switch fallback="ctrl+k palette · tab folders · j/k nav · enter open · ←/→ tabs · [/] page · c compose · e archive · / search">
           <Match when={s.auth.error}>enter/r retry · ctrl+c exit</Match>
           <Match when={s.auth() && !s.auth()!.signedIn}>enter authorize · ctrl+c exit</Match>
           <Match when={s.composeOpen()}>

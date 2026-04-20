@@ -161,7 +161,7 @@ export function openHelp() {
   dialog.open({
     id: "help",
     slot: "content",
-    element: <HelpDialog />,
+    render: () => <HelpDialog />,
   });
 }
 

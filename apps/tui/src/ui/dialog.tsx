@@ -1,20 +1,17 @@
 import type { Renderable } from "@opentui/core";
 import { useKeyboard, useRenderer } from "@opentui/solid";
-import { onMount, Show, type JSX } from "solid-js";
-import { createStore } from "solid-js/store";
+import { createMemo, createSignal, onMount, Show, type JSX } from "solid-js";
 
 export type DialogSlot = "content" | "list";
 
 export type DialogEntry = {
   id: string;
   slot: DialogSlot;
-  element: JSX.Element;
+  render: () => JSX.Element;
   onClose?: () => void;
 };
 
-type DialogStore = { stack: DialogEntry[] };
-
-const [store, setStore] = createStore<DialogStore>({ stack: [] });
+const [stack, setStack] = createSignal<DialogEntry[]>([]);
 
 let rendererRef: { currentFocusedRenderable: Renderable | null; root: Renderable } | null = null;
 let savedFocus: Renderable | null = null;
@@ -47,46 +44,53 @@ function restoreFocus() {
 
 export const dialog = {
   get stack(): readonly DialogEntry[] {
-    return store.stack;
+    return stack();
   },
 
   topForSlot(slot: DialogSlot): DialogEntry | undefined {
-    for (let i = store.stack.length - 1; i >= 0; i--) {
-      const entry = store.stack[i];
+    const s = stack();
+    for (let i = s.length - 1; i >= 0; i--) {
+      const entry = s[i];
       if (entry && entry.slot === slot) return entry;
     }
     return undefined;
   },
 
   has(id: string): boolean {
-    return store.stack.some((e) => e.id === id);
+    return stack().some((e) => e.id === id);
   },
 
   open(entry: DialogEntry) {
-    const existing = store.stack.findIndex((e) => e.id === entry.id);
+    const s = stack();
+    const existing = s.findIndex((e) => e.id === entry.id);
     if (existing >= 0) {
-      setStore("stack", existing, entry);
+      const next = [...s];
+      next[existing] = entry;
+      setStack(next);
       return;
     }
-    if (store.stack.length === 0) saveFocus();
-    setStore("stack", (s) => [...s, entry]);
+    if (s.length === 0) saveFocus();
+    setStack([...s, entry]);
   },
 
   close(id?: string): boolean {
-    if (store.stack.length === 0) return false;
-    const idx = id ? store.stack.findIndex((e) => e.id === id) : store.stack.length - 1;
+    const s = stack();
+    if (s.length === 0) return false;
+    const idx = id ? s.findIndex((e) => e.id === id) : s.length - 1;
     if (idx < 0) return false;
-    const entry = store.stack[idx]!;
+    const entry = s[idx]!;
     entry.onClose?.();
-    setStore("stack", (s) => [...s.slice(0, idx), ...s.slice(idx + 1)]);
-    if (store.stack.length === 0) restoreFocus();
+    const next = [...s.slice(0, idx), ...s.slice(idx + 1)];
+    setStack(next);
+    if (next.length === 0) restoreFocus();
     return true;
   },
 
   clear() {
-    if (store.stack.length === 0) return;
-    for (const entry of store.stack) entry.onClose?.();
-    setStore("stack", []);
+    const s = stack();
+    if (s.length === 0) return;
+    for (const entry of s) entry.onClose?.();
+    setStack([]);
     restoreFocus();
   },
 };
@@ -96,9 +100,20 @@ export function DialogSlot(props: {
   fallback: JSX.Element;
   wrap?: (el: JSX.Element) => JSX.Element;
 }) {
+  const top = createMemo<DialogEntry | undefined>(() => {
+    const s = stack();
+    for (let i = s.length - 1; i >= 0; i--) {
+      const entry = s[i];
+      if (entry && entry.slot === props.slot) return entry;
+    }
+    return undefined;
+  });
   return (
-    <Show when={dialog.topForSlot(props.slot)} keyed fallback={props.fallback}>
-      {(entry: DialogEntry) => (props.wrap ? props.wrap(entry.element) : entry.element)}
+    <Show when={top()} keyed fallback={props.fallback}>
+      {(entry: DialogEntry) => {
+        const el = entry.render();
+        return props.wrap ? props.wrap(el) : el;
+      }}
     </Show>
   );
 }
@@ -116,7 +131,7 @@ export function DialogHost() {
       preventDefault?: () => void;
       defaultPrevented?: boolean;
     }) => {
-      if (store.stack.length === 0) return;
+      if (stack().length === 0) return;
       if (e.defaultPrevented) return;
       if (e.name !== "escape") return;
       e.preventDefault?.();

@@ -41,6 +41,7 @@ function CommandPalette() {
   return (
     <DialogSelect<string>
       title="Commands"
+      hint={kb.print("app.palette")}
       placeholder="type a command…"
       options={options()}
       onFilter={setFilter}
@@ -56,7 +57,7 @@ export function openPalette() {
   dialog.open({
     id: "palette",
     slot: "content",
-    element: <CommandPalette />,
+    render: () => <CommandPalette />,
   });
 }
 

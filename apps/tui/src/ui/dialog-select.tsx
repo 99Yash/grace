@@ -14,6 +14,7 @@ export interface DialogSelectOption<T = unknown> {
 
 export interface DialogSelectProps<T> {
   title?: string;
+  hint?: string;
   placeholder?: string;
   options: DialogSelectOption<T>[];
   onSelect(option: DialogSelectOption<T>): void;
@@ -168,15 +169,41 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   });
 
   return (
-    <box flexDirection="column" paddingTop={1} paddingBottom={1} gap={1}>
+    <box
+      flexDirection="column"
+      flexGrow={1}
+      flexShrink={1}
+      minHeight={0}
+      paddingTop={1}
+      paddingBottom={1}
+      gap={1}
+    >
       <Show when={props.title}>
-        <box paddingLeft={2} paddingRight={2}>
-          <text fg={t.textBright} attributes={1}>
+        <box
+          flexDirection="row"
+          paddingLeft={2}
+          paddingRight={2}
+          height={1}
+          backgroundColor={t.surfaceAlt}
+        >
+          <text fg={t.textBright} attributes={1} flexGrow={1}>
             {props.title}
           </text>
+          <Show when={props.hint}>
+            <text fg={t.textSubtle}>{props.hint}</text>
+          </Show>
         </box>
       </Show>
-      <box paddingLeft={2} paddingRight={2} backgroundColor={t.field}>
+      <box
+        flexDirection="row"
+        paddingLeft={2}
+        paddingRight={2}
+        backgroundColor={t.field}
+        height={1}
+      >
+        <text fg={t.primarySoft} flexShrink={0}>
+          {"› "}
+        </text>
         <input
           ref={(r: InputRenderable) => {
             inputRef = r;
@@ -191,6 +218,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
           cursorColor={t.primary}
           backgroundColor="transparent"
           focusedBackgroundColor="transparent"
+          flexGrow={1}
           onInput={(v: string) =>
             batch(() => {
               setStore("filter", v);
@@ -272,9 +300,16 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                           </text>
                         </Show>
                         <Show when={opt.footer}>
-                          <text fg={active() ? t.primaryOnSelection : t.textSubtle} flexShrink={0}>
-                            {opt.footer}
-                          </text>
+                          <box
+                            flexShrink={0}
+                            paddingLeft={1}
+                            paddingRight={1}
+                            backgroundColor={active() ? "transparent" : t.field}
+                          >
+                            <text fg={active() ? t.primaryOnSelection : t.textMuted}>
+                              {opt.footer}
+                            </text>
+                          </box>
                         </Show>
                       </box>
                     );

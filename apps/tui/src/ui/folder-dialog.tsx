@@ -55,7 +55,7 @@ export function openFolderPicker() {
   dialog.open({
     id: "folder-picker",
     slot: "content",
-    element: <FolderDialog />,
+    render: () => <FolderDialog />,
   });
 }
 

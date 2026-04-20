@@ -6,6 +6,7 @@ import { commands, type CommandOption } from "./ui/command-registry.ts";
 import { openFolderPicker } from "./ui/folder-dialog.tsx";
 import { openHelp } from "./ui/help-dialog.tsx";
 import { openLabelPicker } from "./ui/label-dialog.tsx";
+import { openSearchPalette } from "./ui/search-palette.tsx";
 import { openThemes } from "./ui/theme-dialog.tsx";
 
 const DENSITIES: { id: Density; title: string }[] = [
@@ -75,7 +76,7 @@ export function CommandRegistry() {
         category: "Mail",
         keybind: "app.search",
         suggested: true,
-        onSelect: () => s.openSearch(),
+        onSelect: () => openSearchPalette(),
       },
       {
         title: "Triage inbox",

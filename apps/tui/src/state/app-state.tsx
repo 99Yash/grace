@@ -245,7 +245,7 @@ export function createAppState() {
     dialog.open({
       id: "compose",
       slot: "content",
-      element: <ComposeOverlay />,
+      render: () => <ComposeOverlay />,
       onClose: () => {
         setComposeSending(false);
         setReplyContext(null);
@@ -288,7 +288,7 @@ export function createAppState() {
     dialog.open({
       id: "compose",
       slot: "content",
-      element: <ComposeOverlay />,
+      render: () => <ComposeOverlay />,
       onClose: () => {
         setComposeSending(false);
         setReplyContext(null);
@@ -561,7 +561,7 @@ export function createAppState() {
     dialog.open({
       id: "search",
       slot: "list",
-      element: <SearchOverlay />,
+      render: () => <SearchOverlay />,
       onClose: resetSearchState,
     });
   }
@@ -797,7 +797,7 @@ export function createAppState() {
     dialog.open({
       id: "triage",
       slot: "content",
-      element: <TriageView />,
+      render: () => <TriageView />,
       onClose: () => {
         const remaining = visibleMessages();
         if (remaining.length > 0) {

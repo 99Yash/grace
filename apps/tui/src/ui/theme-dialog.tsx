@@ -31,7 +31,7 @@ export function openThemes() {
   dialog.open({
     id: "themes",
     slot: "content",
-    element: (
+    render: () => (
       <ThemeDialog
         onCommit={() => {
           committed = true;
