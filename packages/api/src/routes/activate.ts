@@ -5,6 +5,7 @@ import { folders, messages } from "@grace/db";
 import { requireGoogleOAuth } from "@grace/env/server";
 import { bootstrapFolder, createImapClient, runBackfill } from "@grace/mail";
 import { bus } from "../bus.ts";
+import { maybeSyncCategories } from "../category-sync.ts";
 import { db } from "../db.ts";
 import { ensureFolderIdle } from "../folder-manager.ts";
 
@@ -100,14 +101,18 @@ async function activateFolder(folderName: string): Promise<ActivateResult> {
       onProgress: (done, target) => {
         bus.publish({ type: "folder.sync.progress", folder: folderName, done, target });
       },
-    }).catch((err) => {
-      backfilled.delete(folderName);
-      console.error(
-        `[backfill] ${folderName} failed:`,
-        err instanceof Error ? err.message : err,
-      );
-    });
+    })
+      .then(() => maybeSyncCategories(folderName))
+      .catch((err) => {
+        backfilled.delete(folderName);
+        console.error(
+          `[backfill] ${folderName} failed:`,
+          err instanceof Error ? err.message : err,
+        );
+      });
   }
+
+  maybeSyncCategories(folderName);
 
   return {
     folder: folderName,

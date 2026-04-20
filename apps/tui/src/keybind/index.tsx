@@ -11,7 +11,7 @@ export const DEFAULT_KEYBINDS = {
   "app.compose": "c",
   "app.refresh": "r",
   "app.help": "?,shift+/",
-  "app.palette": ":,shift+;",
+  "app.palette": "ctrl+p,:,shift+;",
   "app.themes": "<leader>+t",
   "dialog.close": "escape",
   "nav.down": "j,down",
@@ -42,6 +42,8 @@ export const DEFAULT_KEYBINDS = {
   "compose.toggleAttach": "alt+a",
   "search.next": "down,ctrl+j",
   "search.prev": "up,ctrl+k",
+  "list.nextPage": "]",
+  "list.prevPage": "[",
 } as const;
 
 export type KeybindAction = keyof typeof DEFAULT_KEYBINDS;

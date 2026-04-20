@@ -23,6 +23,7 @@ import {
   fetchCurrentDraft,
   fetchFolders,
   fetchMessages,
+  type Folder,
   hitToMessage,
   importHit,
   labelMessage,
@@ -49,16 +50,63 @@ import { useDeferredShow } from "../hooks/useDeferredShow.ts";
 import { subscribeSse, subscribeSseOnce } from "../sse.ts";
 import { dialog } from "../ui/dialog.tsx";
 import { toast, type ToastVariant } from "../ui/toast.tsx";
+import { readCache, writeCache } from "./persist.ts";
 
 type PendingPatch = { read?: boolean; starred?: boolean; removed?: boolean };
 type LiveStatus = "connecting" | "live" | "offline";
 type SearchPhase = "idle" | "searching" | "local-done" | "done" | "error";
 
+export type InboxCategory = "primary" | "promotions" | "social" | "updates" | "forums" | "all";
+export type Density = "compact" | "default" | "comfortable";
+
+const CATEGORY_LABEL: Record<Exclude<InboxCategory, "primary" | "all">, string> = {
+  promotions: "CATEGORY_PROMOTIONS",
+  social: "CATEGORY_SOCIAL",
+  updates: "CATEGORY_UPDATES",
+  forums: "CATEGORY_FORUMS",
+};
+
+const NON_PRIMARY_LABELS = new Set(Object.values(CATEGORY_LABEL));
+
+function matchesCategory(m: Message, cat: InboxCategory): boolean {
+  if (cat === "all") return true;
+  if (cat === "primary") {
+    return !m.labels.some((l) => NON_PRIMARY_LABELS.has(l));
+  }
+  const target = CATEGORY_LABEL[cat];
+  return m.labels.includes(target);
+}
+
 export function createAppState() {
   const [auth, { refetch: refetchAuth }] = createResource(fetchAuth);
   const [caps] = createResource(fetchCapabilities);
   const [activeFolder, setActiveFolder] = createSignal("INBOX");
-  const [folders, { refetch: refetchFolders }] = createResource(() => fetchFolders(false));
+  const [inboxCategory, setInboxCategory] = createSignal<InboxCategory>("primary");
+  const [page, setPage] = createSignal(0);
+  const cachedDensity = readCache<Density>("density");
+  const [density, setDensityRaw] = createSignal<Density>(
+    cachedDensity === "compact" || cachedDensity === "comfortable" || cachedDensity === "default"
+      ? cachedDensity
+      : "default",
+  );
+  function setDensity(d: Density): void {
+    setDensityRaw(d);
+    writeCache("density", d);
+  }
+  function cycleDensity(): void {
+    const order: Density[] = ["compact", "default", "comfortable"];
+    const i = order.indexOf(density());
+    setDensity(order[(i + 1) % order.length]!);
+  }
+  const cachedFolders = readCache<Folder[]>("folders");
+  const [folders, { refetch: refetchFolders }] = createResource(
+    () => fetchFolders(false),
+    cachedFolders && cachedFolders.length > 0 ? { initialValue: cachedFolders } : {},
+  );
+  createEffect(() => {
+    const list = folders();
+    if (list && list.length > 0) writeCache("folders", list);
+  });
   const orderedFolders = () => orderFolders(folders() ?? []);
   const [sidebarFocused, setSidebarFocused] = createSignal(false);
   const [folderSelected, setFolderSelected] = createSignal(0);
@@ -401,14 +449,52 @@ export function createAppState() {
   let searchDebounce: ReturnType<typeof setTimeout> | null = null;
   const searchOpen = () => dialog.has("search");
 
-  const visibleMessages = (): Message[] => {
+  const PAGE_SIZE = 50;
+
+  const filteredMessages = (): Message[] => {
     const list = messages();
     if (!list) return [];
     const p = pending();
-    return list
+    const base = list
       .filter((m) => !p[m.gmMsgid]?.removed)
       .map((m) => applyPending(m));
+    if (activeFolder() !== "INBOX") return base;
+    const cat = inboxCategory();
+    if (cat === "all") return base;
+    return base.filter((m) => matchesCategory(m, cat));
   };
+
+  const pageCount = (): number => {
+    const n = filteredMessages().length;
+    return Math.max(1, Math.ceil(n / PAGE_SIZE));
+  };
+
+  const visibleMessages = (): Message[] => {
+    const list = filteredMessages();
+    const start = page() * PAGE_SIZE;
+    return list.slice(start, start + PAGE_SIZE);
+  };
+
+  const pageRange = (): { start: number; end: number; total: number } => {
+    const total = filteredMessages().length;
+    if (total === 0) return { start: 0, end: 0, total: 0 };
+    const start = page() * PAGE_SIZE + 1;
+    const end = Math.min(total, (page() + 1) * PAGE_SIZE);
+    return { start, end, total };
+  };
+
+  function nextPage(): void {
+    const pc = pageCount();
+    if (page() >= pc - 1) return;
+    setPage(page() + 1);
+    setSelected(0);
+  }
+
+  function prevPage(): void {
+    if (page() === 0) return;
+    setPage(page() - 1);
+    setSelected(0);
+  }
 
   const triageOpen = () => dialog.has("triage");
 
@@ -591,6 +677,8 @@ export function createAppState() {
     if (triageOpen() && triageIndex() >= list.length) {
       setTriageIndex(Math.max(0, list.length - 1));
     }
+    const pc = pageCount();
+    if (page() >= pc) setPage(Math.max(0, pc - 1));
   });
 
   async function switchFolder(path: string) {
@@ -604,6 +692,8 @@ export function createAppState() {
     setActiveMsg(null);
     closeSearch();
     setActiveFolder(path);
+    setInboxCategory("primary");
+    setPage(0);
     setSidebarFocused(false);
     try {
       await activateFolder(path);
@@ -829,6 +919,8 @@ export function createAppState() {
     messages,
     body,
     activeFolder,
+    inboxCategory,
+    density,
     sidebarFocused,
     folderSelected,
     selected,
@@ -870,10 +962,24 @@ export function createAppState() {
     setSearchQuery,
     setSearchSelected,
     setComposeField,
+    setInboxCategory: (c: InboxCategory) => {
+      if (inboxCategory() === c) return;
+      setInboxCategory(c);
+      setPage(0);
+      setSelected(0);
+    },
+    setDensity,
+    cycleDensity,
+    nextPage,
+    prevPage,
 
     // derived
     orderedFolders,
     visibleMessages,
+    filteredMessages,
+    pageCount,
+    pageRange,
+    page,
     currentMsg,
 
     // actions

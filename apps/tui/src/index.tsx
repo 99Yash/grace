@@ -5,6 +5,7 @@ import { DaemonOffline } from "./components/DaemonOffline.tsx";
 import { FolderHeader, TopBar } from "./components/Header.tsx";
 import { HelpBar } from "./components/HelpBar.tsx";
 import { InboxList } from "./components/MessageList.tsx";
+import { InboxTabs } from "./components/InboxTabs.tsx";
 import { Onboarding } from "./components/Onboarding.tsx";
 import { Reader } from "./components/Reader.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
@@ -97,7 +98,7 @@ function Layout() {
       return;
     }
 
-    if (kb.match("sidebar.toggle", e) && !s.searchOpen() && !s.readerOpen()) {
+    if (kb.match("sidebar.toggle", e) && !s.searchOpen()) {
       s.setSidebarFocused((f) => !f);
       return;
     }
@@ -142,6 +143,11 @@ function Layout() {
     }
 
     if (s.readerOpen()) {
+      if (kb.match("dialog.close", e)) {
+        s.setReaderOpen(false);
+        s.setActiveMsg(null);
+        return;
+      }
       const m = s.currentMsg();
       if (m) {
         if (kb.match("mail.toggleRead", e)) { void s.runMutation(m, "toggle-read"); return; }
@@ -166,6 +172,30 @@ function Layout() {
     if (kb.match("app.search", e) && !s.searchOpen()) { s.openSearch(); return; }
     if (kb.match("app.compose", e)) { s.openCompose(); return; }
     if (kb.match("app.refresh", e)) { void s.refetch(); return; }
+    if (!s.sidebarFocused() && !s.readerOpen()) {
+      if (kb.match("list.nextPage", e)) { s.nextPage(); return; }
+      if (kb.match("list.prevPage", e)) { s.prevPage(); return; }
+    }
+    if (
+      s.activeFolder() === "INBOX" &&
+      !s.sidebarFocused() &&
+      !s.readerOpen() &&
+      !e.ctrl && !e.meta && !e.shift && !e.option
+    ) {
+      const tabs: ReadonlyArray<"primary" | "promotions" | "social" | "updates" | "forums" | "all"> =
+        ["primary", "promotions", "social", "updates", "forums", "all"];
+      const n = e.name ?? "";
+      if (/^[1-6]$/.test(n)) {
+        const picked = tabs[Number(n) - 1];
+        if (picked) { s.setInboxCategory(picked); return; }
+      }
+      if (n === "right" || n === "left") {
+        const cur = tabs.indexOf(s.inboxCategory() as typeof tabs[number]);
+        const delta = n === "right" ? 1 : -1;
+        const next = tabs[(cur + delta + tabs.length) % tabs.length];
+        if (next) { s.setInboxCategory(next); return; }
+      }
+    }
     if (!total) return;
     if (kb.match("nav.down", e)) {
       s.setSelected((v) => Math.min(total - 1, v + 1));
@@ -199,49 +229,52 @@ function Layout() {
         fallback={
           <>
             <FolderHeader />
-            <Show
-              when={s.messages()}
-              fallback={
-                <box flexGrow={1} padding={1}>
-                  <text fg={t.textSubtle}>loading inbox…</text>
-                </box>
-              }
-            >
-              <box flexDirection="row" flexGrow={1} flexShrink={1} minHeight={0}>
-                <Sidebar />
-                <box width={1} flexShrink={0} backgroundColor={t.field} />
-                <DialogSlot
-                  slot="content"
-                  wrap={(el) => (
-                    <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
-                      {el}
-                    </box>
-                  )}
+            <box flexDirection="row" flexGrow={1} flexShrink={1} minHeight={0}>
+              <Sidebar />
+              <box width={1} flexShrink={0} backgroundColor={t.field} />
+              <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
+                <Show
+                  when={s.messages()}
                   fallback={
-                    <>
-                      <box
-                        flexDirection="column"
-                        flexGrow={s.readerOpen() ? 0 : 1}
-                        flexShrink={1}
-                        minHeight={0}
-                        minWidth={0}
-                        {...(s.readerOpen() ? { width: 48 } : {})}
-                      >
-                        <DialogSlot slot="list" fallback={<InboxList />} />
-                      </box>
-                      <Show when={s.readerOpen() && s.currentMsg()?.gmMsgid} keyed>
-                        {(_id: string) => (
-                          <>
-                            <box width={1} flexShrink={0} backgroundColor={t.field} />
-                            <Reader />
-                          </>
-                        )}
-                      </Show>
-                    </>
+                    <box flexGrow={1} padding={1}>
+                      <text fg={t.textSubtle}>loading inbox…</text>
+                    </box>
                   }
-                />
+                >
+                  <DialogSlot
+                    slot="content"
+                    wrap={(el) => (
+                      <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
+                        {el}
+                      </box>
+                    )}
+                    fallback={
+                      <box flexDirection="row" flexGrow={1} flexShrink={1} minHeight={0} minWidth={0}>
+                        <box
+                          flexDirection="column"
+                          flexGrow={s.readerOpen() ? 0 : 1}
+                          flexShrink={1}
+                          minHeight={0}
+                          minWidth={0}
+                          {...(s.readerOpen() ? { width: 48 } : {})}
+                        >
+                          <InboxTabs />
+                          <DialogSlot slot="list" fallback={<InboxList />} />
+                        </box>
+                        <Show when={s.readerOpen() && s.currentMsg()?.gmMsgid} keyed>
+                          {(_id: string) => (
+                            <>
+                              <box width={1} flexShrink={0} backgroundColor={t.field} />
+                              <Reader />
+                            </>
+                          )}
+                        </Show>
+                      </box>
+                    }
+                  />
+                </Show>
               </box>
-            </Show>
+            </box>
           </>
         }
       >

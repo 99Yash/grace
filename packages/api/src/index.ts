@@ -26,6 +26,7 @@ export {
   stopNetworkMonitorSingleton,
   getNetworkStatus,
 } from "./network-monitor.ts";
+export { maybeSyncCategories, resetCategorySync } from "./category-sync.ts";
 export type { DraftRecord } from "./routes/drafts.ts";
 export type { SearchHit } from "./routes/search.ts";
 

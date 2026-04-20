@@ -4,6 +4,7 @@ import {
   bus,
   ensureFolderIdle,
   getCapabilities,
+  maybeSyncCategories,
   startNetworkMonitorSingleton,
   stopFolderManager,
   stopNetworkMonitorSingleton,
@@ -77,13 +78,15 @@ function kickBackfill(folderName: string): void {
     onProgress: (done, target) => {
       bus.publish({ type: "folder.sync.progress", folder: folderName, done, target });
     },
-  }).catch((err) => {
-    backfillStarted.delete(folderName);
-    console.error(
-      `[backfill:${folderName}] failed:`,
-      err instanceof Error ? err.message : err,
-    );
-  });
+  })
+    .then(() => maybeSyncCategories(folderName))
+    .catch((err) => {
+      backfillStarted.delete(folderName);
+      console.error(
+        `[backfill:${folderName}] failed:`,
+        err instanceof Error ? err.message : err,
+      );
+    });
 }
 
 function ensureInboxIdle(): void {

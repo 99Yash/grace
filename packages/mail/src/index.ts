@@ -35,6 +35,19 @@ export {
   DEFAULT_BACKFILL_BATCH,
   type BackfillOpts,
 } from "./backfill.ts";
+export {
+  apiIdToGmMsgid,
+  CATEGORY_LABELS,
+  createGmailApi,
+  type CategoryLabel,
+  type GmailApi,
+  type GmailApiOpts,
+} from "./gmail-api.ts";
+export {
+  syncCategories,
+  type SyncCategoriesOpts,
+  type SyncCategoriesResult,
+} from "./sync-categories.ts";
 export { FETCH_HEADER_FIELDS, persistHeaderMessage } from "./persist.ts";
 export {
   applyMutation,

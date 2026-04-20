@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { DEBUG, type Message } from "../api.ts";
 import { formatRelative, truncate, visibleLabels } from "../format.ts";
+import type { Density } from "../state/app-state.tsx";
 import { useAppState } from "../state/app-state.tsx";
 import { useTheme } from "../theme/index.tsx";
 
@@ -20,53 +21,97 @@ function MessageRow(props: {
   msg: Message;
   selected: boolean;
   compact: boolean;
+  density: Density;
   activeFolder: string;
+  onClick: () => void;
+  onDoubleClick: () => void;
 }) {
   const t = useTheme();
   const subjectFg = () => (props.selected ? t.text : props.msg.read ? t.textRead : t.textBright);
   const metaFg = () => (props.selected ? t.primaryOnSelection : t.textSubtle);
   const labelFg = () => (props.selected ? t.primaryOnSelection : t.primarySoft);
+  const isDense = () => props.density === "compact" || props.compact;
+  const showSender = () => !props.compact && props.density !== "compact";
+  const showLabels = () => !props.compact && props.density !== "compact";
+  const showSecondRow = () => props.density === "comfortable" && !props.compact;
   const pills = () =>
-    props.compact ? { shown: [], extra: 0 } : visibleLabels(props.msg.labels, props.activeFolder, 2);
+    showLabels() ? visibleLabels(props.msg.labels, props.activeFolder, 2) : { shown: [], extra: 0 };
+
+  let lastClick = 0;
+  const handleMouseDown = () => {
+    const now = Date.now();
+    if (now - lastClick < 350) {
+      props.onDoubleClick();
+      lastClick = 0;
+    } else {
+      props.onClick();
+      lastClick = now;
+    }
+  };
+
   return (
     <box
-      flexDirection="row"
-      height={1}
+      flexDirection="column"
+      height={showSecondRow() ? 2 : 1}
       flexShrink={0}
       overflow="hidden"
-      paddingLeft={1}
-      paddingRight={1}
       backgroundColor={props.selected ? t.selection : "transparent"}
+      onMouseDown={handleMouseDown}
     >
-      <text fg={props.msg.read ? t.textGhost : t.primary} width={COL.flag} flexShrink={0}>
-        {props.msg.read ? " " : "●"}
-      </text>
-      <text fg={t.star} width={COL.star} flexShrink={0}>
-        {props.msg.starred ? "★" : " "}
-      </text>
-      <For each={pills().shown}>
-        {(label) => (
-          <text fg={labelFg()} flexShrink={0}>
-            {`[${truncate(label, 14)}] `}
+      <box
+        flexDirection="row"
+        height={1}
+        flexShrink={0}
+        overflow="hidden"
+        paddingLeft={1}
+        paddingRight={1}
+      >
+        <text fg={props.msg.read ? t.textGhost : t.primary} width={COL.flag} flexShrink={0}>
+          {props.msg.read ? " " : "●"}
+        </text>
+        <text fg={t.star} width={COL.star} flexShrink={0}>
+          {props.msg.starred ? "★" : " "}
+        </text>
+        <Show when={showLabels()}>
+          <For each={pills().shown}>
+            {(label) => (
+              <text fg={labelFg()} flexShrink={0}>
+                {`[${truncate(label, 14)}] `}
+              </text>
+            )}
+          </For>
+          <Show when={pills().extra > 0}>
+            <text fg={labelFg()} flexShrink={0}>
+              {`+${pills().extra} `}
+            </text>
+          </Show>
+        </Show>
+        <text fg={subjectFg()} flexGrow={1} flexShrink={1}>
+          {truncate(props.msg.subject ?? "(no subject)", isDense() ? 38 : 80)}
+        </text>
+        <Show when={showSender() && !showSecondRow()}>
+          <text fg={metaFg()} width={COL.sender} flexShrink={0}>
+            {truncate(props.msg.fromName ?? props.msg.fromEmail ?? "", COL.sender - 1)}
           </text>
-        )}
-      </For>
-      <Show when={pills().extra > 0}>
-        <text fg={labelFg()} flexShrink={0}>
-          {`+${pills().extra} `}
+        </Show>
+        <text fg={metaFg()} width={COL.date} flexShrink={0}>
+          {formatRelative(props.msg.date)}
         </text>
+      </box>
+      <Show when={showSecondRow()}>
+        <box
+          flexDirection="row"
+          height={1}
+          flexShrink={0}
+          overflow="hidden"
+          paddingLeft={5}
+          paddingRight={1}
+        >
+          <text fg={metaFg()} flexGrow={1} flexShrink={1}>
+            {truncate(props.msg.fromName ?? props.msg.fromEmail ?? "", 60)}
+          </text>
+        </box>
       </Show>
-      <text fg={subjectFg()} flexGrow={1} flexShrink={1}>
-        {truncate(props.msg.subject ?? "(no subject)", props.compact ? 38 : 80)}
-      </text>
-      <Show when={!props.compact}>
-        <text fg={metaFg()} width={COL.sender} flexShrink={0}>
-          {truncate(props.msg.fromName ?? props.msg.fromEmail ?? "", COL.sender - 1)}
-        </text>
-      </Show>
-      <text fg={metaFg()} width={COL.date} flexShrink={0}>
-        {formatRelative(props.msg.date)}
-      </text>
     </box>
   );
 }
@@ -122,7 +167,14 @@ export function InboxList() {
             msg={msg}
             selected={s.selected() === i()}
             compact={s.readerOpen()}
+            density={s.density()}
             activeFolder={s.activeFolder()}
+            onClick={() => s.setSelected(i())}
+            onDoubleClick={() => {
+              s.setSelected(i());
+              s.setActiveMsg(null);
+              s.setReaderOpen(true);
+            }}
           />
         )}
       </For>

@@ -1,13 +1,15 @@
 import { desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { folders, messages } from "@grace/db";
+import { maybeSyncCategories } from "../category-sync.ts";
 import { db } from "../db.ts";
 
 export const messageRoutes = new Elysia({ prefix: "/messages" }).get(
   "/",
   ({ query }) => {
     const folderName = query.folder ?? "INBOX";
-    const limit = Math.min(200, Math.max(1, Number(query.limit ?? 50)));
+    maybeSyncCategories(folderName);
+    const limit = Math.min(1000, Math.max(1, Number(query.limit ?? 50)));
     const offset = Math.max(0, Number(query.offset ?? 0));
 
     const folder = db().select().from(folders).where(eq(folders.name, folderName)).get();

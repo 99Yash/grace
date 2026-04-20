@@ -5,7 +5,7 @@ import { useAppState } from "../state/app-state.tsx";
 import { useTheme } from "../theme/index.tsx";
 import { Spinner } from "./Spinner.tsx";
 
-function BodyHeader(props: { msg: Message }) {
+function BodyHeader(props: { msg: Message; onBack: () => void }) {
   const t = useTheme();
   const fromLine = () =>
     props.msg.fromName
@@ -24,6 +24,18 @@ function BodyHeader(props: { msg: Message }) {
       paddingRight={1}
       paddingTop={1}
     >
+      <box flexDirection="row" height={1} flexShrink={0} overflow="hidden">
+        <box
+          flexShrink={0}
+          paddingRight={1}
+          onMouseDown={(e) => { e.preventDefault(); props.onBack(); }}
+        >
+          <text fg={t.primarySoft}>← Back</text>
+        </box>
+        <text fg={t.textFaint} flexGrow={1}>
+          esc · tab for folders
+        </text>
+      </box>
       <box height={1} flexShrink={0} overflow="hidden">
         <text attributes={1} fg={t.text}>
           {truncate(props.msg.subject ?? "(no subject)", 200)}
@@ -74,9 +86,14 @@ export function Reader() {
   const bodyColor = () => (showStale() ? t.textFaint : t.textBody);
   const quoteColor = () => (showStale() ? t.textGhost : t.textSubtle);
 
+  const back = () => {
+    s.setReaderOpen(false);
+    s.setActiveMsg(null);
+  };
+
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} overflow="hidden">
-      <BodyHeader msg={msg()} />
+      <BodyHeader msg={msg()} onBack={back} />
       <Show when={!s.body.error} fallback={
         <box padding={1}><text fg={t.error}>{`failed to load body: ${s.body.error instanceof Error ? s.body.error.message : String(s.body.error)}`}</text></box>
       }>

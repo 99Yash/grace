@@ -4,7 +4,12 @@ import { truncate } from "../format.ts";
 import { useAppState } from "../state/app-state.tsx";
 import { useTheme } from "../theme/index.tsx";
 
-function FolderRow(props: { folder: Folder; selected: boolean; focused: boolean }) {
+function FolderRow(props: {
+  folder: Folder;
+  selected: boolean;
+  focused: boolean;
+  onClick: () => void;
+}) {
   const t = useTheme();
   const fg = () =>
     props.focused && props.selected
@@ -35,6 +40,7 @@ function FolderRow(props: { folder: Folder; selected: boolean; focused: boolean 
       backgroundColor={
         props.selected ? (props.focused ? t.selection : t.field) : "transparent"
       }
+      onMouseDown={() => props.onClick()}
     >
       <text fg={fg()} flexGrow={1} flexShrink={1}>
         {truncate(label(), 18)}
@@ -85,6 +91,7 @@ export function Sidebar() {
                   : f.path === s.activeFolder()
               }
               focused={s.sidebarFocused()}
+              onClick={() => void s.switchFolder(f.path)}
             />
           )}
         </For>
