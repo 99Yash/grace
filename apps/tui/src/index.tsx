@@ -13,7 +13,7 @@ import { KeybindProvider, useKeybind } from "./keybind/index.tsx";
 import { AppStateProvider, useAppState } from "./state/app-state.tsx";
 import { ThemeProvider, useTheme } from "./theme/index.tsx";
 import { openPalette } from "./ui/command-palette.tsx";
-import { DialogHost, DialogSlot } from "./ui/dialog.tsx";
+import { dialog, DialogHost, DialogSlot, OverlayHost } from "./ui/dialog.tsx";
 import { openHelp } from "./ui/help-dialog.tsx";
 import { openLabelPicker } from "./ui/label-dialog.tsx";
 import { openThemes } from "./ui/theme-dialog.tsx";
@@ -185,6 +185,12 @@ function Layout() {
       return;
     }
 
+    // Any remaining content-slot dialog (palette, search-palette, help, themes,
+    // folder/label pickers) owns the input surface. The mode-specific handlers
+    // above handled their own dialogs; what's left are input-capturing dialogs
+    // where global shortcuts must not fire from typed characters.
+    if (dialog.topForSlot("content")) return;
+
     if (s.readerOpen()) {
       if (kb.match("dialog.close", e)) {
         s.setReaderOpen(false);
@@ -340,6 +346,7 @@ function Layout() {
   return (
     <box flexDirection="column" backgroundColor={t.background} style={{ height: "100%" }}>
       <DialogHost />
+      <OverlayHost />
       <ToastHost />
       <CommandRegistry />
       <TopBar />

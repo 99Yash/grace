@@ -326,7 +326,8 @@ export function openSearchPalette() {
   if (dialog.has("search-palette")) return;
   dialog.open({
     id: "search-palette",
-    slot: "content",
+    slot: "overlay",
+    size: "large",
     render: () => <SearchPalette />,
   });
 }

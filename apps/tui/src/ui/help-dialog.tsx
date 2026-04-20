@@ -160,7 +160,8 @@ function HelpDialog() {
 export function openHelp() {
   dialog.open({
     id: "help",
-    slot: "content",
+    slot: "overlay",
+    size: "large",
     render: () => <HelpDialog />,
   });
 }

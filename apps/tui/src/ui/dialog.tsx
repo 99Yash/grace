@@ -1,14 +1,18 @@
-import type { Renderable } from "@opentui/core";
-import { useKeyboard, useRenderer } from "@opentui/solid";
+import { type Renderable, RGBA } from "@opentui/core";
+import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid";
 import { createMemo, createSignal, onMount, Show, type JSX } from "solid-js";
+import { useTheme } from "../theme/index.tsx";
 
-export type DialogSlot = "content" | "list";
+export type DialogSlot = "content" | "list" | "overlay";
+
+export type OverlaySize = "medium" | "large";
 
 export type DialogEntry = {
   id: string;
   slot: DialogSlot;
   render: () => JSX.Element;
   onClose?: () => void;
+  size?: OverlaySize;
 };
 
 const [stack, setStack] = createSignal<DialogEntry[]>([]);
@@ -114,6 +118,53 @@ export function DialogSlot(props: {
         const el = entry.render();
         return props.wrap ? props.wrap(el) : el;
       }}
+    </Show>
+  );
+}
+
+function panelWidth(size: OverlaySize | undefined, terminalWidth: number): number {
+  const target = size === "large" ? 88 : 60;
+  return Math.min(target, Math.max(30, terminalWidth - 4));
+}
+
+export function OverlayHost() {
+  const t = useTheme();
+  const dims = useTerminalDimensions();
+
+  const top = createMemo<DialogEntry | undefined>(() => {
+    const s = stack();
+    for (let i = s.length - 1; i >= 0; i--) {
+      const entry = s[i];
+      if (entry && entry.slot === "overlay") return entry;
+    }
+    return undefined;
+  });
+
+  return (
+    <Show when={top()} keyed>
+      {(entry: DialogEntry) => (
+        <box
+          position="absolute"
+          left={0}
+          top={0}
+          width={dims().width}
+          height={dims().height}
+          zIndex={3000}
+          alignItems="center"
+          paddingTop={Math.max(2, Math.floor(dims().height / 5))}
+          backgroundColor={RGBA.fromInts(0, 0, 0, 140)}
+          onMouseUp={() => dialog.close(entry.id)}
+        >
+          <box
+            width={panelWidth(entry.size, dims().width)}
+            backgroundColor={t.surface}
+            paddingTop={1}
+            onMouseUp={(e: { stopPropagation?: () => void }) => e.stopPropagation?.()}
+          >
+            {entry.render()}
+          </box>
+        </box>
+      )}
     </Show>
   );
 }

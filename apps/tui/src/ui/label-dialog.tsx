@@ -68,7 +68,7 @@ function LabelDialog() {
 export function openLabelPicker() {
   dialog.open({
     id: "label-picker",
-    slot: "content",
+    slot: "overlay",
     render: () => <LabelDialog />,
   });
 }

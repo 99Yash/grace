@@ -56,7 +56,7 @@ function CommandPalette() {
 export function openPalette() {
   dialog.open({
     id: "palette",
-    slot: "content",
+    slot: "overlay",
     render: () => <CommandPalette />,
   });
 }

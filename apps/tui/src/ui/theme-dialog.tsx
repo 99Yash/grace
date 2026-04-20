@@ -30,7 +30,7 @@ export function openThemes() {
   let committed = false;
   dialog.open({
     id: "themes",
-    slot: "content",
+    slot: "overlay",
     render: () => (
       <ThemeDialog
         onCommit={() => {
